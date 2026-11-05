@@ -1,5 +1,12 @@
 import { SiwcError } from './siwc-errors.ts';
-export type ChatMessage={role:'user'|'assistant';content:string};
+export type AiVendor='openai'|'anthropic'|'gemini';
+// provider는 답변 아바타용 브라우저 표시 정보다. 서버 DB에는 저장하지 않으며 AI API로 보내기 전에 apiMessages로 뺀다.
+export type ChatMessage={role:'user'|'assistant';content:string;provider?:AiVendor};
+export const apiMessages=(messages:ChatMessage[])=>messages.map(({role,content})=>({role,content}));
+// 서버에서 받은 노트에는 provider가 없으므로 같은 위치의 같은 메시지면 브라우저 값을 이어 붙인다.
+export function keepProviders(messages:ChatMessage[],cached:ChatMessage[]):ChatMessage[]{
+  return messages.map((m,i)=>{const c=cached[i];return c?.provider&&c.role===m.role&&c.content===m.content?{...m,provider:c.provider}:m;});
+}
 export function validMessages(value:unknown):value is ChatMessage[]{
   return Array.isArray(value)&&value.length>0&&value.length<=100&&value.every(m=>m&&['user','assistant'].includes(m.role)&&typeof m.content==='string'&&m.content.trim().length>0&&m.content.length<=20000)&&value.reduce((n,m)=>n+m.content.length,0)<=100000;
 }

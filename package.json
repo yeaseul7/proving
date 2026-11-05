@@ -13,9 +13,12 @@
     "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.5.0",
+    "@google/genai": "^2.32.0",
     "jose": "^6.2.15",
     "katex": "^0.19.1",
     "next": "^16.0.0",
+    "openai": "^7.51.0",
     "pg": "^8.23.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
