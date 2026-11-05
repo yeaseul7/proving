@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 nextEnv.loadEnvConfig(process.cwd(), true, { info() {}, error() {} });
 const apply = process.argv.includes('--apply');
-const names = ['messages', 'notebooks', 'profiles', 'record_messages', 'study_records', 'users'];
+const names = ['devices', 'link_codes', 'messages', 'notebooks', 'profiles', 'record_messages', 'study_records', 'user_identities', 'users'];
 const applied = [];
 let pool;
 let client;
@@ -53,6 +53,31 @@ async function verifyProfileConstraints() {
   }
 }
 
+async function verifyIdentityConstraints() {
+  const { rows: [{ missing }] } = await client.query(`SELECT count(*)::int AS missing FROM study.users u
+    WHERE u.oauth_account_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM study.user_identities i
+      WHERE i.user_id=u.id AND i.provider='chatgpt' AND i.account_key=u.oauth_account_id)`);
+  assert.equal(missing, 0, 'Every existing user keeps its ChatGPT identity.');
+  await client.query('SAVEPOINT identity_rows');
+  try {
+    const owner = randomUUID();
+    const key = owner.replaceAll('-', '').repeat(2);
+    await client.query('INSERT INTO study.users(id) VALUES ($1)', [owner]);
+    const identitySql = 'INSERT INTO study.user_identities(user_id, provider, account_key) VALUES ($1, $2, $3)';
+    await client.query(identitySql, [owner, 'google', key]);
+    await expectRejected(identitySql, [owner, 'google', key], '23505');
+    await expectRejected(identitySql, [owner, 'github', key], '23514');
+    const deviceSql = 'INSERT INTO study.devices(user_id, name, token_hash) VALUES ($1, $2, $3)';
+    await client.query(deviceSql, [owner, 'Mac', key]);
+    await expectRejected(deviceSql, [owner, 'Other', key], '23505');
+    await expectRejected(deviceSql, [owner, ' ', randomUUID().replaceAll('-', '').repeat(2)], '23514');
+    await expectRejected("INSERT INTO study.link_codes(code_hash, user_id, expires_at) VALUES ($1, $2, now() - interval '1 minute')", [key, owner], '23514');
+  } finally {
+    await client.query('ROLLBACK TO SAVEPOINT identity_rows');
+    await client.query('RELEASE SAVEPOINT identity_rows');
+  }
+}
+
 async function verifyConstraints() {
   await client.query('SAVEPOINT verification_rows');
   try {
@@ -97,7 +122,8 @@ try {
     // 아직 적용하지 않은 마이그레이션만 순서대로 적용한다. 기존 테이블은 수정·삭제하지 않는다.
     const { rows: [state] } = await client.query(`SELECT
       EXISTS(SELECT 1 FROM pg_namespace WHERE nspname='study') AS schema,
-      to_regclass('study.profiles') IS NOT NULL AS profiles`);
+      to_regclass('study.profiles') IS NOT NULL AS profiles,
+      to_regclass('study.user_identities') IS NOT NULL AS identities`);
     // SQL 파일은 단독 실행도 가능하다. 이 실행기에서는 검증까지 같은 트랜잭션에 넣는다.
     await client.query('BEGIN');
     if (!state.schema) {
@@ -113,6 +139,13 @@ try {
       phase = 'constraint verification 002';
       await verifyProfileConstraints();
       applied.push('002_profiles');
+    }
+    if (!state.identities) {
+      phase = 'migration 003';
+      await client.query(migration('003_identities_devices.sql'));
+      phase = 'constraint verification 003';
+      await verifyIdentityConstraints();
+      applied.push('003_identities_devices');
     }
   }
 
@@ -135,7 +168,7 @@ try {
     SELECT table_name, column_name, udt_name FROM information_schema.columns
     WHERE table_schema='study' AND (column_name='id' OR (table_name='study_records' AND column_name='summary'))
   `);
-  assert.equal(types.filter(column => column.column_name === 'id' && column.udt_name === 'uuid').length, 5);
+  assert.equal(types.filter(column => column.column_name === 'id' && column.udt_name === 'uuid').length, 6);
   assert.ok(types.some(column => column.table_name === 'study_records' && column.column_name === 'summary' && column.udt_name === 'jsonb'));
   assert.deepEqual(tables.map(table => table.name), names);
   assert.ok(tables.every(table => table.rls && table.primary_keys === 1));
