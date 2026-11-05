@@ -7,3 +7,10 @@ node_modules/
 # Local preview artifacts
 editor-preview.png
 .DS_Store
+
+# Local OAuth host identity
+.local/
+
+# Playwright
+/playwright-report/
+/test-results/
