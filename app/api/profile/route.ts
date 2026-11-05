@@ -1,4 +1,4 @@
-import { assertLocal } from '@/lib/chat-auth';
+import { getAuth } from '@/lib/auth';
 import { getVerifiedStudyAccount, transaction } from '@/lib/notebook-server';
 import { parseProfileInput } from '@/lib/profile';
 import { ProfileError, readOwnProfile, saveProfile } from '@/lib/profile-db';
@@ -11,7 +11,7 @@ function json(body: unknown, status = 200) {
 }
 
 async function handle(request: Request, write: boolean) {
-  try { assertLocal(request, write); }
+  try { getAuth().checkRequest(request, write); }
   catch { return json({ error: '요청 출처를 확인할 수 없습니다.' }, 403); }
   try {
     const account = await getVerifiedStudyAccount();

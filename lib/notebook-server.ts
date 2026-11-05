@@ -1,10 +1,11 @@
 import 'server-only';
-import { assertLocal, getSession } from './chat-auth.ts';
+import { assertLocal } from './chat-auth.ts';
+import { getAuth } from './auth/index.ts';
 import { createNotebookApi } from './notebook-api.ts';
-import { studyAccountFromSession, type StudyQuery } from './study-users.ts';
+import type { StudyQuery } from './study-users.ts';
 
 export async function getVerifiedStudyAccount(): Promise<string | null> {
-  return studyAccountFromSession(await getSession());
+  return (await getAuth().getIdentity())?.accountKey ?? null;
 }
 
 export async function transaction<T>(work: (db: StudyQuery) => Promise<T>): Promise<T> {

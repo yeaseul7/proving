@@ -152,6 +152,8 @@ CREATE TABLE study.link_codes (
 | 5 | Vercel 비공개 배포 | 배포 | 실제 로그인→로컬 공부→배포 사이트에서 기록·공개 프로필 확인 |
 | 6 | (선택) OpenAI 관심 신청 / `openai-key` 공급자 | — | 승인 조건 또는 한도 값 확정 후 결정 |
 
+1단계 완료 (2026-11-05): `lib/auth/`(`getAuth`, `requireIdentity`), `lib/ai/`(`getAi`), `lib/sync/`(`getStudyStore`), `lib/runtime-mode.ts`(조합 검사). OAuth·세션 파일 처리는 `lib/chat-auth.ts`에 그대로 두고 `lib/auth/siwc.ts`가 감싼다. 모든 라우트는 공급자를 통해서만 인증·AI·저장에 접근한다.
+
 ## 환경변수
 
 | 이름 | 로컬 학습 앱 | 배포 사이트 |
