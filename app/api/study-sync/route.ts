@@ -40,6 +40,9 @@ async function handle(request: Request, write: boolean) {
     return json(result);
   } catch (error) {
     if (error instanceof StudySyncError) return json({ error: error.message }, error.status);
+    // 오류 원문에는 접속 정보나 사용자 내용이 포함될 수 있어 코드와 제약조건 이름만 남긴다.
+    const { code, constraint } = (error ?? {}) as { code?: unknown; constraint?: unknown };
+    console.error('study-sync failed', { write, code, constraint, name: (error as Error)?.name });
     return json({ error: '서버 공부 기록을 처리하지 못했습니다. 다시 시도해주세요.' }, 503);
   }
 }

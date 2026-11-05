@@ -5,9 +5,10 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { readRegistration, saveRegistration } from './login-registration.ts';
-import { readSession, writeSession, deleteSession, SESSION_MAX_AGE_SECONDS, type StudySession } from './session-store.ts';
+import { readSession, writeSession, deleteSession, sessionExpired, SESSION_MAX_AGE_SECONDS, SESSION_ABSOLUTE_MAX_AGE_SECONDS, type StudySession } from './session-store.ts';
 export { SESSION_MAX_AGE_SECONDS } from './session-store.ts';
 import { cookies } from 'next/headers';
+import { after } from 'next/server';
 
 const ISSUER = 'https://auth.openai.com';
 const TOKEN_URL = `${ISSUER}/api/accounts/oauth/token`;
@@ -23,6 +24,11 @@ const globalAuth = globalThis as typeof globalThis & { studyAuth?: { pending: Ma
 const state: NonNullable<typeof globalAuth.studyAuth> = globalAuth.studyAuth ??= {pending:new Map(), sessions:new Map(), refreshes:new Map()};
 const signingOut = new Set<string>();
 const jwks = createRemoteJWKSet(new URL(`${ISSUER}/.well-known/jwks.json`));
+// 교체되거나 만료된 세션의 refresh token이 OpenAI에 유효한 채로 남지 않게 응답 후 폐기한다.
+async function discardSession(id:string,session:Session|null|undefined){
+  state.sessions.delete(id);await deleteSession(sessionDirectory,id);
+  if(session?.refresh)after(()=>revokeSession(session.refresh,session.client).catch(()=>false));
+}
 export function localOrigin(request: Request) {
   const host=request.headers.get('host')??new URL(request.url).host;
   if(!/^127\.0\.0\.1(?::\d{1,5})?$/.test(host))throw new Error('이 로그인 방식은 127.0.0.1에서 실행하는 로컬 버전용입니다.');
@@ -72,11 +78,11 @@ export async function finishLogin(request: Request) {
   if(payload.nonce!==pending.nonce||!payload.sub||(pending.subject&&payload.sub!==pending.subject))throw new Error('로그인 정보를 검증하지 못했습니다.');
   if(typeof token.access_token!=='string'||typeof token.expires_in!=='number')throw new Error('인증 토큰을 받지 못했습니다.');
   const sessionId=random();
-  const session:Session={account:createHash('sha256').update(`${ISSUER}:${payload.sub}`).digest('hex'),name:typeof payload.name==='string'?payload.name:'내 계정',subject:payload.sub,client,access:token.access_token,refresh:token.refresh_token,expires:Date.now()+token.expires_in*1000,sessionExpires:Date.now()+SESSION_MAX_AGE_SECONDS*1000,scopes:typeof token.scope==='string'?token.scope.split(' '):[]};
+  const session:Session={account:createHash('sha256').update(`${ISSUER}:${payload.sub}`).digest('hex'),name:typeof payload.name==='string'?payload.name:'내 계정',subject:payload.sub,client,access:token.access_token,refresh:token.refresh_token,expires:Date.now()+token.expires_in*1000,sessionExpires:Date.now()+SESSION_MAX_AGE_SECONDS*1000,sessionDeadline:Date.now()+SESSION_ABSOLUTE_MAX_AGE_SECONDS*1000,scopes:typeof token.scope==='string'?token.scope.split(' '):[]};
   const registration=await saveRegistration(registrationDirectory,{client,subject:payload.sub});
   await writeSession(sessionDirectory,sessionId,session);
   state.sessions.set(sessionId,session);
-  const old=jar.get(COOKIE)?.value;if(old){state.sessions.delete(old);await deleteSession(sessionDirectory,old);}
+  const old=jar.get(COOKIE)?.value;if(old&&old!==sessionId)await discardSession(old,state.sessions.get(old)??await readSession(sessionDirectory,old));
   return {sessionId,registration};
 }
 export async function getSession() {
@@ -85,13 +91,13 @@ export async function getSession() {
   let session=state.sessions.get(id);
   if(!session){session=(await readSession(sessionDirectory,id))??undefined;if(session)state.sessions.set(id,session);}
   if(signingOut.has(id))return null;
-  if(!session||session.sessionExpires<=Date.now()){
-    state.sessions.delete(id);await deleteSession(sessionDirectory,id);return null;
-  }
-  // Renew on actual authenticated requests, rather than a background timer.
-  session.sessionExpires=Date.now()+SESSION_MAX_AGE_SECONDS*1000;
+  if(!session||sessionExpired(session)){await discardSession(id,session);return null;}
+  // Renew on actual authenticated requests, rather than a background timer, but never past the login deadline.
+  // 상한이 없던 기존 세션은 현재 만료 시각을 상한으로 삼아 더 연장하지 않는다.
+  session.sessionDeadline??=session.sessionExpires;
+  session.sessionExpires=Math.min(Date.now()+SESSION_MAX_AGE_SECONDS*1000,session.sessionDeadline);
   await writeSession(sessionDirectory,id,session);
-  jar.set(COOKIE,id,{httpOnly:true,sameSite:'lax',path:'/',maxAge:SESSION_MAX_AGE_SECONDS});
+  jar.set(COOKIE,id,{httpOnly:true,sameSite:'lax',path:'/',maxAge:Math.ceil((session.sessionExpires-Date.now())/1000)});
   return session;
 }
 export async function authorizedSession() {
