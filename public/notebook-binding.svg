@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="34" height="44" viewBox="0 0 34 44">
+  <!-- The punched slot sits inside the paper; the wire loops over its edge. -->
+  <rect x="21" y="14" width="8" height="16" rx="3.5" fill="#deddd3"/>
+  <rect x="22.5" y="15.5" width="5" height="13" rx="2.5" fill="#777d72"/>
+  <path d="M25 18C19 15 5 15 5 22s14 7 20 4" fill="none" stroke="#faf9f5" stroke-width="5.5" stroke-linecap="round"/>
+  <path d="M25 18C19 15 5 15 5 22s14 7 20 4" fill="none" stroke="#626b63" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M24.7 17.6C18.8 14.9 5.3 15.4 5.3 21.6s13.5 6.7 19.4 4" fill="none" stroke="#b9c0b7" stroke-width="1.7" stroke-linecap="round"/>
+  <path d="M23.8 17.4C18.3 15.4 7.5 15.7 6.1 20.2" fill="none" stroke="#f2f3ed" stroke-width=".7" stroke-linecap="round"/>
+</svg>
