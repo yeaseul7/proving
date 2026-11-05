@@ -465,7 +465,8 @@ main { padding-top: 12px; }
 .egg-cell.selected { outline: 2px solid var(--color-egg-focus); outline-offset: 1px; }
 .egg-cell.outside { visibility: hidden; }
 .egg-legend { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--color-text-muted); margin-top: 7px; }
-.egg-legend > div { display: flex; align-items: center; gap: 5px; }
+.egg-legend > div { display: flex; align-items: center; gap: 5px 12px; flex-wrap: wrap; }
+.legend-item { display: inline-flex; align-items: center; gap: 4px; }
 .legend-egg { display: inline-flex; width: 21px; height: 21px; }
 .legend-egg svg { width: 21px; height: 21px; }
 .egg-empty-sample { width: 13px; height: 13px; border-radius: 2px; background: var(--color-egg-empty); border: 1px solid var(--color-egg-border); margin: 0 3px; }
@@ -849,6 +850,7 @@ button, input, textarea, select, .reading-text, .reading-text code { font-family
 
 /* A compact study ledger shared by recent notes and the records view. */
 .notes-ledger { width: 100%; border-block: 1px solid var(--color-border-strong); }
+.notes-ledger .notes-more { display: flex; align-items: center; gap: 4px; margin: 10px 4px 10px auto; }
 .notes-ledger table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 17px; }
 .notes-ledger th, .notes-ledger td { padding: 9px 10px; border-bottom: 1px solid var(--color-border); text-align: center; vertical-align: middle; line-height: 1.6; }
 .notes-ledger th { background: var(--color-accent-soft); color: var(--color-text-muted); font-weight: 400; font-size: 15px; }

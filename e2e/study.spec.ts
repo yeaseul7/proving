@@ -238,3 +238,26 @@ test('화면별 글꼴 모드를 기억하고 모바일에서도 언어 선택�
   const bounds = await language.boundingBox();
   expect(Math.abs(bounds!.x + bounds!.width / 2 - 195)).toBeLessThan(2);
 });
+
+test('개요는 최근·선택한 날짜의 노트를 3개까지만 보여주고 나머지는 기록에서 본다', async ({ page }) => {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
+  const records = Array.from({ length: 6 }, (_, i) => ({
+    id: crypto.randomUUID(), title: `노트 ${i + 1}`, subject: 'GPT 공부', date: i < 5 ? today : '2026-01-05',
+    updatedAt: new Date(Date.now() - i * 60_000).toISOString(), content: '요약', messages: [], cloud: true as const,
+  }));
+  await page.route('**/api/study-sync', route => route.request().method() === 'GET'
+    ? route.fulfill({ json: { account, notebooks: [], records, closedIds: [] } })
+    : route.fallback());
+  await page.goto('/');
+  await page.getByRole('navigation', { name: '메인 메뉴' }).getByRole('button', { name: '개요', exact: true }).click();
+  const rows = page.locator('.notes-ledger tbody tr');
+  const more = page.getByRole('button', { name: '기록에서 더보기' });
+  await expect(rows).toHaveCount(3);
+  await expect(more).toBeVisible();
+
+  await page.getByRole('button', { name: `${today} · 공부 기록 5개` }).click();
+  await expect(rows).toHaveCount(3);
+  await more.click();
+  await expect(page.getByRole('navigation', { name: '메인 메뉴' }).getByRole('button', { name: /^기록/ })).toHaveClass(/active/);
+  await expect(rows).toHaveCount(5);
+});
