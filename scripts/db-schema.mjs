@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 
 nextEnv.loadEnvConfig(process.cwd(), true, { info() {}, error() {} });
 const apply = process.argv.includes('--apply');
-const names = ['messages', 'notebooks', 'record_messages', 'study_records', 'users'];
+const names = ['messages', 'notebooks', 'profiles', 'record_messages', 'study_records', 'users'];
+const applied = [];
 let pool;
 let client;
 let phase = 'connect';
@@ -28,6 +29,27 @@ async function expectRejected(sql, params, code) {
   } finally {
     await client.query('ROLLBACK TO SAVEPOINT constraint_check');
     await client.query('RELEASE SAVEPOINT constraint_check');
+  }
+}
+
+function migration(file) {
+  return readFileSync(new URL(`../db/migrations/${file}`, import.meta.url), 'utf8').replace(/^BEGIN;$/m, '').replace(/^COMMIT;$/m, '');
+}
+
+async function verifyProfileConstraints() {
+  await client.query('SAVEPOINT profile_rows');
+  try {
+    const [owner, other] = [randomUUID(), randomUUID()];
+    await client.query('INSERT INTO study.users(id, oauth_account_id) VALUES ($1, $2), ($3, $4)', [owner, owner.replaceAll('-', '').repeat(2), other, other.replaceAll('-', '').repeat(2)]);
+    const profileSql = 'INSERT INTO study.profiles(user_id, handle, is_public) VALUES ($1, $2, $3)';
+    await expectRejected(profileSql, [owner, 'Upper', false], '23514');
+    await expectRejected(profileSql, [owner, null, true], '23514');
+    await expectRejected(profileSql, [randomUUID(), 'ghost', false], '23503');
+    await client.query(profileSql, [owner, 'verify_handle', true]);
+    await expectRejected(profileSql, [other, 'verify_handle', false], '23505');
+  } finally {
+    await client.query('ROLLBACK TO SAVEPOINT profile_rows');
+    await client.query('RELEASE SAVEPOINT profile_rows');
   }
 }
 
@@ -72,15 +94,26 @@ try {
   if (exposureConfigured) throw new Error('Study is listed in a database-visible Data API schema setting.');
 
   if (apply) {
-    const { rows } = await client.query("SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname='study') AS present");
-    if (rows[0].present) throw new Error('Existing study schema; no changes applied.');
-    phase = 'migration';
+    // 아직 적용하지 않은 마이그레이션만 순서대로 적용한다. 기존 테이블은 수정·삭제하지 않는다.
+    const { rows: [state] } = await client.query(`SELECT
+      EXISTS(SELECT 1 FROM pg_namespace WHERE nspname='study') AS schema,
+      to_regclass('study.profiles') IS NOT NULL AS profiles`);
     // SQL 파일은 단독 실행도 가능하다. 이 실행기에서는 검증까지 같은 트랜잭션에 넣는다.
-    const sql = readFileSync(new URL('../db/migrations/001_initial_schema.sql', import.meta.url), 'utf8').replace(/^BEGIN;$/m, '').replace(/^COMMIT;$/m, '');
     await client.query('BEGIN');
-    await client.query(sql);
-    phase = 'constraint verification';
-    await verifyConstraints();
+    if (!state.schema) {
+      phase = 'migration 001';
+      await client.query(migration('001_initial_schema.sql'));
+      phase = 'constraint verification 001';
+      await verifyConstraints();
+      applied.push('001_initial_schema');
+    }
+    if (!state.profiles) {
+      phase = 'migration 002';
+      await client.query(migration('002_profiles.sql'));
+      phase = 'constraint verification 002';
+      await verifyProfileConstraints();
+      applied.push('002_profiles');
+    }
   }
 
   phase = 'metadata verification';
@@ -110,11 +143,11 @@ try {
   const counts = {};
   for (const name of names) counts[name] = Number((await client.query(`SELECT count(*) FROM study.${name}`)).rows[0].count);
   if (apply) {
-    assert.ok(Object.values(counts).every(count => count === 0));
+    if (applied.includes('001_initial_schema')) assert.ok(Object.values(counts).every(count => count === 0));
     phase = 'commit';
     await client.query('COMMIT');
   }
-  console.log(JSON.stringify({ applied: apply, tables, grants, rowCounts: counts, databaseVisibleExposureSettings: settings.length > 0 ? 'study_not_listed' : 'not_available', constraintTests: apply ? 'passed_and_rolled_back' : 'not_run' }, null, 2));
+  console.log(JSON.stringify({ applied, tables, grants, rowCounts: counts, databaseVisibleExposureSettings: settings.length > 0 ? 'study_not_listed' : 'not_available', constraintTests: applied.length ? 'passed_and_rolled_back' : 'not_run' }, null, 2));
 } catch (error) {
   if (client && apply) await client.query('ROLLBACK').catch(() => {});
   // 서버 원문에는 접속 주소·SQL 값이 포함될 수 있어 구조화된 진단만 표시한다.

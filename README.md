@@ -39,6 +39,8 @@ npm run dev
 - `app/api/`: 계정 확인·모델 목록·공부 대화·로그아웃
 - `components/study-chat.tsx`: 공부 채팅 및 자동 노트 생성
 - `lib/study.ts`: 공부일, 연속일 및 Markdown 내보내기
+- `components/profile-editor.tsx`, `app/api/profile/`: 개요의 내 프로필(Markdown 소개글·아이디·공개 여부)
+- `app/u/[handle]/`: 공개 프로필. 사용자별 title·description·canonical·Open Graph·Twitter 메타 태그와 JSON-LD(ProfilePage)를 생성한다. 절대 URL은 `NEXT_PUBLIC_SITE_URL`(기본 `http://127.0.0.1:3005`)을 기준으로 한다. 로컬 실행 중에는 외부에서 열리지 않으므로 공유·검색 노출은 배포 후에 동작한다.
 
 공식 문서:
 - https://developers.openai.com/siwc/token-sharing-open-source/sign-in

@@ -17,7 +17,8 @@ const legendLevels=[
   {count:2,ko:'보통',en:'Some',koHint:'하루 2개',enHint:'2 notes a day'},
   {count:3,ko:'많이',en:'Many',koHint:'하루 3개 이상',enHint:'3+ notes a day'},
 ];
-export function EggGarden({notes,today,selected,onSelect}:{notes:StudyNote[];today:string;selected:string|null;onSelect:(day:string|null)=>void}){
+// onSelect가 없으면 공개 프로필용 읽기 전용 그래프로 그린다.
+export function EggGarden({notes=[],counts:dayCounts,today,selected=null,onSelect}:{notes?:StudyNote[];counts?:Record<string,number>;today:string;selected?:string|null;onSelect?:(day:string|null)=>void}){
   const {language}=useLanguage();
   const en=language==='en';
   if(!today)return <div className="egg-loading">{en?'Loading study history…':'공부 기록을 불러오는 중'}</div>;
@@ -25,14 +26,14 @@ export function EggGarden({notes,today,selected,onSelect}:{notes:StudyNote[];tod
   const first=new Date(end);first.setFullYear(first.getFullYear()-1);first.setDate(first.getDate()+1);
   const start=new Date(first);start.setDate(start.getDate()-start.getDay());
   const cells:{date:string;count:number;future:boolean;outside:boolean}[]=[];
-  const counts=new Map<string,number>();for(const note of notes)counts.set(note.date,(counts.get(note.date)??0)+1);
+  const counts=new Map<string,number>(dayCounts?Object.entries(dayCounts):[]);if(!dayCounts)for(const note of notes)counts.set(note.date,(counts.get(note.date)??0)+1);
   const cursor=new Date(start);
   do{const date=dateKey(cursor);cells.push({date,count:counts.get(date)??0,future:date>today,outside:cursor<first});cursor.setDate(cursor.getDate()+1);}while(cursor<=end||cursor.getDay()!==0);
   const weeks=cells.length/7;
   const labels=Array.from({length:weeks},(_,i)=>{const day=new Date(`${cells[i*7].date}T12:00:00`);return i===0||day.getDate()<=7?(en?day.toLocaleDateString('en-US',{month:'short'}):String(day.getMonth()+1)):'';});
   return <section className="egg-garden" aria-label={en?'Study history for the past year':'최근 1년 공부 기록'}>
     
-    <div className="egg-chart"><div className="egg-month-axis"><div className="egg-months" style={{gridTemplateColumns:`repeat(${weeks},minmax(0,1fr))`}}>{labels.map((label,i)=><span key={i}>{label}</span>)}</div>{!en&&<span className="egg-month-unit">월</span>}</div><div className="egg-body"><div className="egg-weekdays" aria-hidden="true">{['',en?'Mon':'월','',en?'Wed':'수','',en?'Fri':'금',''].map((label,i)=><span key={i}>{label}</span>)}</div><div className="egg-grid" style={{gridTemplateColumns:`repeat(${weeks},minmax(0,1fr))`,aspectRatio:`${weeks} / 7`}}>{cells.map(cell=>{const label=en?`${cell.date} · ${cell.count} study notes`:`${cell.date} · 공부 기록 ${cell.count}개`;return cell.future||cell.outside?<span className="egg-cell outside" key={cell.date}/>:<button key={cell.date} className={`egg-cell ${cell.count?'cooked':'uncooked'} ${selected===cell.date?'selected':''}`} title={label} aria-label={label} aria-pressed={selected===cell.date} onClick={()=>onSelect(selected===cell.date?null:cell.date)}>{cell.count?<EggForCount count={cell.count}/>:<span/>}</button>})}</div></div></div>
+    <div className="egg-chart"><div className="egg-month-axis"><div className="egg-months" style={{gridTemplateColumns:`repeat(${weeks},minmax(0,1fr))`}}>{labels.map((label,i)=><span key={i}>{label}</span>)}</div>{!en&&<span className="egg-month-unit">월</span>}</div><div className="egg-body"><div className="egg-weekdays" aria-hidden="true">{['',en?'Mon':'월','',en?'Wed':'수','',en?'Fri':'금',''].map((label,i)=><span key={i}>{label}</span>)}</div><div className="egg-grid" style={{gridTemplateColumns:`repeat(${weeks},minmax(0,1fr))`,aspectRatio:`${weeks} / 7`}}>{cells.map(cell=>{const label=en?`${cell.date} · ${cell.count} study notes`:`${cell.date} · 공부 기록 ${cell.count}개`;return cell.future||cell.outside?<span className="egg-cell outside" key={cell.date}/>:!onSelect?<span key={cell.date} role="img" className={`egg-cell ${cell.count?'cooked':'uncooked'}`} title={label} aria-label={label}>{cell.count?<EggForCount count={cell.count}/>:<span/>}</span>:<button key={cell.date} className={`egg-cell ${cell.count?'cooked':'uncooked'} ${selected===cell.date?'selected':''}`} title={label} aria-label={label} aria-pressed={selected===cell.date} onClick={()=>onSelect(selected===cell.date?null:cell.date)}>{cell.count?<EggForCount count={cell.count}/>:<span/>}</button>})}</div></div></div>
     <div className="egg-legend"><div>{legendLevels.map(({count,ko,en:enLabel,koHint,enHint})=><span className="legend-item" key={count} title={en?enHint:koHint}><span className="legend-egg"><EggForCount count={count}/></span>{en?enLabel:ko}</span>)}</div></div>
   </section>;
 }
