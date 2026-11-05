@@ -619,8 +619,8 @@ button, input, textarea, select, .reading-text, .reading-text code { font-family
 .study-paper .study-record-action { z-index: 10; }
 .study-record-action > div > button { pointer-events: auto; }
 
-.notebook-title-sticker { flex: 0 1 260px; width: 260px; max-width: 100%; }
-@media (max-width: 600px) { .notebook-title-sticker { flex-basis: 210px; width: 210px; max-width: 100%; } }
+.notebook-title-sticker { flex: 0 1 440px; width: 440px; max-width: 100%; }
+@media (max-width: 600px) { .notebook-title-sticker { flex-basis: 100%; width: 100%; max-width: 100%; } }
 
 .study-paper > .paper-heading { background: transparent; }
 
@@ -743,6 +743,7 @@ button, input, textarea, select, .reading-text, .reading-text code { font-family
   border-radius: 3px;
 }
 .detail-dialog .note-content::before { display: none; }
+:root[data-theme=dark] .study-paper, :root[data-theme=dark] .detail-dialog .note-content { background-image: none; }
 
 /* Overview and records keep their footer at the bottom of the available page. */
 .app-shell:not(.study-layout) { min-height: 100dvh; }
