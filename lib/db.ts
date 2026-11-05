@@ -8,7 +8,9 @@ const globalForDb = globalThis as unknown as { pgPool?: Pool };
 function createPool(): Pool {
   const connectionString = process.env.DATABASE_URL;
   const caPath = process.env.SUPABASE_CA_PATH;
-  if (!connectionString || !caPath) {
+  // 배포 환경은 파일 대신 PEM 본문을 환경변수(SUPABASE_CA_CERT)로 받는다. 줄바꿈은 \n으로 넣어도 된다.
+  const caText = process.env.SUPABASE_CA_CERT?.replace(/\\n/g, '\n');
+  if (!connectionString || (!caPath && !caText)) {
     throw Object.assign(new Error('Database configuration missing'), { code: 'DB_CONFIG_MISSING' });
   }
 
@@ -26,11 +28,12 @@ function createPool(): Pool {
     }
   }
 
-  const ca = readFileSync(path.resolve(process.cwd(), caPath), 'utf8');
+  const ca = caText || readFileSync(path.resolve(process.cwd(), caPath!), 'utf8');
   const pool = new Pool({
     connectionString: url.toString(),
     ssl: { ca, rejectUnauthorized: true },
-    max: 5,
+    // 서버리스 인스턴스가 많아질 수 있어 배포에서는 작게 둔다(DB_POOL_MAX=1). 연결은 Supabase transaction pooler(6543)를 쓴다.
+    max: Number(process.env.DB_POOL_MAX) || 5,
     connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 30000,
   });

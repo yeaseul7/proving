@@ -7,6 +7,7 @@ import type { AuthProvider } from './types.ts';
 
 // Sign in with ChatGPT(동적 등록) 로컬 로그인. OAuth·세션 파일·갱신·폐기는 chat-auth.ts가 담당한다.
 export const siwcAuth: AuthProvider = {
+  provider: 'chatgpt',
   checkRequest: assertLocal,
 
   async getIdentity() {

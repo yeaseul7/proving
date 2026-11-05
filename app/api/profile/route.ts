@@ -1,5 +1,6 @@
 import { getAuth } from '@/lib/auth';
-import { getVerifiedStudyAccount, transaction } from '@/lib/notebook-server';
+import { transaction } from '@/lib/notebook-server';
+import { runtimeMode } from '@/lib/runtime-mode';
 import { parseProfileInput } from '@/lib/profile';
 import { ProfileError, readOwnProfile, saveProfile } from '@/lib/profile-db';
 import { findOrCreateStudyUser } from '@/lib/study-users';
@@ -14,10 +15,13 @@ async function handle(request: Request, write: boolean) {
   try { getAuth().checkRequest(request, write); }
   catch { return json({ error: '요청 출처를 확인할 수 없습니다.' }, 403); }
   try {
-    const account = await getVerifiedStudyAccount();
-    if (!account) return json({ error: '다시 로그인해주세요.' }, 401);
+    // 배포 사이트와 연결한 로컬 앱은 DB에 직접 접근하지 않는다. 프로필은 배포 사이트에서 편집한다.
+    if (runtimeMode().store === 'remote') return json({ error: '프로필은 배포 사이트에서 편집해주세요.' }, 409);
+    const identity = await getAuth().getIdentity();
+    if (!identity) return json({ error: '다시 로그인해주세요.' }, 401);
+    const user = (db: Parameters<typeof findOrCreateStudyUser>[0]) => findOrCreateStudyUser(db, identity.accountKey, identity.provider);
     if (!write) {
-      const profile = await transaction(async db => readOwnProfile(db, await findOrCreateStudyUser(db, account)));
+      const profile = await transaction(async db => readOwnProfile(db, await user(db)));
       return json({ profile });
     }
 
@@ -28,7 +32,7 @@ async function handle(request: Request, write: boolean) {
       input = parseProfileInput(JSON.parse(raw));
     } catch { return json({ error: '프로필 입력이 올바르지 않습니다.' }, 400); }
     if (typeof input === 'string') return json({ error: input }, 400);
-    const profile = await transaction(async db => saveProfile(db, await findOrCreateStudyUser(db, account), input));
+    const profile = await transaction(async db => saveProfile(db, await user(db), input));
     return json({ profile });
   } catch (error) {
     if (error instanceof ProfileError) return json({ error: error.message }, error.status);

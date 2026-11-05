@@ -154,6 +154,8 @@ CREATE TABLE study.link_codes (
 
 1단계 완료 (2026-11-05): `lib/auth/`(`getAuth`, `requireIdentity`), `lib/ai/`(`getAi`), `lib/sync/`(`getStudyStore`), `lib/runtime-mode.ts`(조합 검사). OAuth·세션 파일 처리는 `lib/chat-auth.ts`에 그대로 두고 `lib/auth/siwc.ts`가 감싼다. 모든 라우트는 공급자를 통해서만 인증·AI·저장에 접근한다.
 
+2~4단계 구현 (2026-11-05): 마이그레이션 003(`user_identities`, `devices`, `link_codes`), Google 로그인(`lib/auth/supabase.ts`), 배포용 AI 없음(`lib/ai/none.ts`), 기기 연결(`lib/devices.ts`, `/api/devices`, `/api/devices/link`, `npm run link`), 동기화 API(`/api/sync`, `lib/sync/remote-store.ts`). 배포 절차: [deploy.md](deploy.md)
+
 ## 환경변수
 
 | 이름 | 로컬 학습 앱 | 배포 사이트 |

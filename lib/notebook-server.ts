@@ -4,8 +4,10 @@ import { getAuth } from './auth/index.ts';
 import { createNotebookApi } from './notebook-api.ts';
 import type { StudyQuery } from './study-users.ts';
 
+// 기존 노트 API(/api/notebooks)는 ChatGPT 로그인 계정만 다룬다. 배포 사이트의 Google 계정은 401로 막는다.
 export async function getVerifiedStudyAccount(): Promise<string | null> {
-  return (await getAuth().getIdentity())?.accountKey ?? null;
+  const identity = await getAuth().getIdentity();
+  return identity?.provider === 'chatgpt' ? identity.accountKey : null;
 }
 
 export async function transaction<T>(work: (db: StudyQuery) => Promise<T>): Promise<T> {

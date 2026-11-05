@@ -26,6 +26,8 @@ export function StudyChat({onRecord,onRecordsLoaded,onAccount,onLogout,resume}:{
   const [accountHost,setAccountHost]=useState<HTMLElement|null>(null);
   useEffect(()=>setAccountHost(document.getElementById('sidebar-account')),[]);
   const [account,setAccount]=useState<Account|null>(null);
+  // 배포 사이트(Google 로그인)에서는 서버가 GPT를 호출하지 않는다. /api/session이 로그인 전에도 알려준다.
+  const [siteMode,setSiteMode]=useState<'chatgpt'|'google'>('chatgpt');
   const [checking,setChecking]=useState(true);
   const [models,setModels]=useState<{id:string;name:string}[]>([]);
   const [model,setModel]=useState('');
@@ -125,6 +127,7 @@ export function StudyChat({onRecord,onRecordsLoaded,onAccount,onLogout,resume}:{
       try{
         const response=await fetch('/api/session',{signal:controller.signal,cache:'no-store'});if(!response.ok)throw new Error('로그인 상태를 확인하지 못했습니다. 새로고침해주세요.');
         const session=await response.json();
+        if(session.provider==='google')setSiteMode('google');
         const a:Account|null=session.account?session:null;
         setAccount(a);onAccount(a);
         if(a?.canChat){try{setWelcome(localStorage.getItem(`study-plan-notice-${a.account}`)!=='1');}catch{setWelcome(true);}}
@@ -176,7 +179,7 @@ export function StudyChat({onRecord,onRecordsLoaded,onAccount,onLogout,resume}:{
         }
         setNotebooks(workspace.notebooks);setActiveId(workspace.activeId);setInput(workspace.notebooks.find(n=>n.id===workspace.activeId)?.draft??'');
         if(a?.canChat){const r=await fetch('/api/models',{signal:controller.signal,cache:'no-store'});const data=await r.json();if(!r.ok){handleFailure(r.status,data);return;}setModels(data.models);if(!data.models.length)setError('이 계정에서 사용할 수 있는 모델이 없습니다.');}
-        if(new URLSearchParams(location.search).has('auth_error')){setError('ChatGPT 로그인을 완료하지 못했습니다. 계정의 연동 권한을 확인하고 다시 시도해주세요.');history.replaceState(null,'',location.pathname);}
+        if(new URLSearchParams(location.search).has('auth_error')){const authError=new URLSearchParams(location.search).get('auth_error');setError(authError==='not_allowed'?'아직 초대되지 않은 계정입니다. 운영자에게 초대를 요청해주세요.':session.provider==='google'?'Google 로그인을 완료하지 못했습니다. 다시 시도해주세요.':'ChatGPT 로그인을 완료하지 못했습니다. 계정의 연동 권한을 확인하고 다시 시도해주세요.');history.replaceState(null,'',location.pathname);}
       }catch(e){if(!controller.signal.aborted)setError(e instanceof Error?e.message:'연결 상태를 확인하지 못했습니다.');}
       finally{if(!controller.signal.aborted)setChecking(false);}
     }
@@ -327,7 +330,7 @@ export function StudyChat({onRecord,onRecordsLoaded,onAccount,onLogout,resume}:{
     finally{setBusy(false);}
   }
   return <section className="study-space" aria-label={t('GPT 공부 채팅')}>
-    {accountHost&&createPortal(<div className="sidebar-account-controls">{checking?<span>{t('계정 확인 중')}</span>:account?<><span className="connected-account" title={account.canChat?t('ChatGPT 플랜 연결됨'):t('플랜 사용 승인 필요')}><span className="status-dot"/>{account.name}</span><button className="logout-button" aria-label={t('로그아웃')} title={t('로그아웃')} disabled={busy} onClick={signOut}><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 4H4v16h5M10 12h11m-4-4 4 4-4 4"/></svg></button></>:<a className="text-button" href="/auth/login" data-oai-siwc-button>Continue with ChatGPT</a>}</div>,accountHost)}
+    {accountHost&&createPortal(<div className="sidebar-account-controls">{checking?<span>{t('계정 확인 중')}</span>:account?<><span className="connected-account" title={account.canChat?t('ChatGPT 플랜 연결됨'):t('플랜 사용 승인 필요')}><span className="status-dot"/>{account.name}</span><button className="logout-button" aria-label={t('로그아웃')} title={t('로그아웃')} disabled={busy} onClick={signOut}><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 4H4v16h5M10 12h11m-4-4 4 4-4 4"/></svg></button></>:siteMode==='google'?<a className="text-button" href="/auth/login">{language==='en'?'Sign in':'로그인'}</a>:<a className="text-button" href="/auth/login" data-oai-siwc-button>Continue with ChatGPT</a>}</div>,accountHost)}
     {welcome && account?.canChat && (
       <div className="plan-welcome" role="dialog" aria-modal="false" aria-label="ChatGPT 플랜 사용 안내">
         <strong>{language === 'en' ? 'Using your ChatGPT plan' : 'ChatGPT 플랜을 사용합니다'}</strong>
@@ -348,10 +351,10 @@ export function StudyChat({onRecord,onRecordsLoaded,onAccount,onLogout,resume}:{
     {recovery&&<div className="chat-recovery" role="status">{recovery==='reauth'||recovery==='permission'?<button type="button" className="text-button" disabled={busy} onClick={reauthenticate}>{language==='en'?'Reauthenticate with ChatGPT':'ChatGPT 다시 인증하기'}</button>:recovery==='usage'?<><a href={usageUrl} target="_blank" rel="noreferrer">{language==='en'?'Manage usage':'사용량 관리'}</a><button type="button" className="text-button" onClick={()=>{setRecovery(null);if(!models.length)location.reload();}}>{language==='en'?'I checked my limit':'사용량 확인 후 다시 시도'}</button></>:<button type="button" className="text-button" onClick={()=>{setRecovery(null);if(!models.length)location.reload();}}>{language==='en'?'Try again':'다시 시도'}</button>}<span>{language==='en'?'Your conversation and draft are preserved.':'공부 대화와 초안은 유지됩니다.'}</span></div>}
     {syncError && <p className="chat-error" role="status">{syncError} <button type="button" className="text-button" disabled={busy} onClick={()=>setSyncRetry(value=>value+1)}>{language==='en'?'Retry sync':'동기화 다시 시도'}</button></p>}
     {error&&<p className="chat-error" role="alert">{t(error)}</p>}
-    {account&&!account.canChat&&!Object.keys(keys).length&&<p className="chat-error">{t('로그인은 되었지만 AI 사용 권한이 없습니다.')} <button type="button" className="text-button" onClick={reauthenticate}>{t('ChatGPT 플랜 사용 승인하기')}</button></p>}
+    {account&&!account.canChat&&!Object.keys(keys).length&&(siteMode==='google'?<p className="chat-error">{t('Claude 또는 Gemini API 키를 등록하면 바로 공부할 수 있어요.')} <button type="button" className="text-button" onClick={()=>setKeyPanel(true)}>{t('API 키 등록')}</button></p>:<p className="chat-error">{t('로그인은 되었지만 AI 사용 권한이 없습니다.')} <button type="button" className="text-button" onClick={reauthenticate}>{t('ChatGPT 플랜 사용 승인하기')}</button></p>)}
     <div className="notebook-desk"><div className="study-paper">{recording&&<RecordingLoader english={language==='en'}/>}<div className="paper-heading"><div className="notebook-title-sticker"><input className="notebook-title" aria-label={t('대화 제목')} maxLength={100} value={t(conversation.title)} disabled={!account||busy||checking||historyError} onChange={e=>renameNotebook(e.target.value)} onBlur={finishRename} onKeyDown={e=>{if(e.key==='Enter'&&!e.nativeEvent.isComposing)e.currentTarget.blur();}}/></div></div>
     <div className={`study-messages ${conversation.messages.length?'':'showing-example'}`} aria-label={t('공부 대화')} aria-busy={busy}>
-      {!checking&&!account&&<div className="study-login-prompt"><a className="button primary" href="/auth/login" data-oai-siwc-button>Continue with ChatGPT</a></div>}
+      {!checking&&!account&&<div className="study-login-prompt">{siteMode==='google'?<a className="button primary" href="/auth/login">{language==='en'?'Sign in':'로그인'}</a>:<a className="button primary" href="/auth/login" data-oai-siwc-button>Continue with ChatGPT</a>}</div>}
       {!conversation.messages.length&&<StudyDemo/>}
       {conversation.messages.map((message,i)=><article className={`chat-message ${message.role}`} key={i}>{message.role==='assistant'&&<span className="message-author gpt-avatar"><AiLogo provider={message.provider}/></span>}<StudyMarkdown>{message.content}</StudyMarkdown></article>)}
       {!busy&&conversation.messages.at(-1)?.role==='user'&&<button className="text-button retry-answer" onClick={()=>send(undefined,false,true)} disabled={Boolean(recovery)||!canChat||!model}>{language==='en'?'Retry reply':'답변 다시 받기'} ↻</button>}

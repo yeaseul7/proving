@@ -8,6 +8,7 @@
     "start": "next start --hostname 127.0.0.1 --port 3005",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
+    "link": "node scripts/link-device.mjs",
     "test:e2e": "npm run build && playwright test",
     "test:e2e:ui": "npm run build && playwright test --ui",
     "test:e2e:report": "playwright show-report"
@@ -15,6 +16,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^1.5.0",
     "@google/genai": "^2.32.0",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.119.0",
     "jose": "^6.2.15",
     "katex": "^0.19.1",
     "next": "^16.0.0",
