@@ -53,7 +53,11 @@ npm test
 npm run build
 ```
 
-기존 대화 편집 관련 파일은 보존했지만 현재 화면에서 사용하지 않습니다.
+DB 통합 테스트는 `.env.local`의 Supabase에 접속하며, 만든 행은 모두 롤백합니다.
+
+```sh
+node --conditions=react-server --experimental-strip-types --test tests/*.integration.ts
+```
 
 ## 브라우저 E2E 테스트
 

@@ -1,6 +1,6 @@
 # proving 데이터베이스
 
-`study`는 Next.js의 서버 전용 `pg` 연결로만 사용하는 스키마다. OAuth·토큰 저장은 기존 로컬 파일 방식을 유지한다. 프론트엔드의 localStorage 기록은 아직 자동 이전하지 않는다.
+`study`는 Next.js의 서버 전용 `pg` 연결로만 사용하는 스키마다. OAuth·토큰 저장은 기존 로컬 파일 방식을 유지한다. 로그인 후 브라우저에 남아 있던 진행 중 노트는 서버 노트와 합쳐 업로드하며, 합칠 수 없는 경우 브라우저에 별도 백업한다. 서버 연동 이전에 브라우저에만 보관된 기록(보관함)은 이전하지 않고 해당 브라우저에서만 보인다.
 
 ## 마이그레이션
 
@@ -42,13 +42,17 @@ JSONB 기본 형식:
 - 테이블 소유자/관리자 DB 연결은 RLS를 우회할 수 있다. API는 반드시 서버 세션의 account로 사용자를 찾고 모든 쿼리를 `user_id`로 제한해야 한다. 클라이언트가 보낸 user_id를 신뢰하지 않는다.
 - 이 설계는 서버 API를 위한 기반이며 브라우저의 Supabase Data API 직접 접근을 지원하지 않는다.
 
-## 다음 API 구현 순서
+## API
 
-1. 기존 서버 세션으로 `users`를 조회하거나 생성하는 서버 전용 함수 — 완료
-2. `GET/POST /api/notebooks`, `GET/PATCH /api/notebooks/:id`: 목록·생성·상세·제목·보관 — 완료. [노트 API 명세](notebooks-api.md)
-3. 기존 `/api/chat`에 메시지 저장 연결: 질문을 먼저 저장하고 답변 완료 후 저장; 안정적인 메시지 UUID로 재시도
-4. `POST /api/study-records`: 요약 완료 후 기록·원문 스냅샷을 한 트랜잭션에 저장
-5. `GET /api/study-records`, `GET /api/study-records/:id`: 기록 목록·상세
-6. 별도 localStorage 가져오기 API: 사용자 확인, UUID 매핑·중복 방지 후 이전
+화면은 `/api/study-sync` 하나로 DB를 읽고 쓴다 (`lib/study-sync.ts`, `lib/study-sync-client.ts`). 모든 요청은 서버 세션의 account로 사용자를 찾고 사용자 행을 잠근 트랜잭션에서 처리한다.
+
+- `GET`: 진행 중 노트(메시지·초안 포함), 종료한 노트 ID, 공부 기록 목록을 반환한다.
+- `POST { action: 'save', notebook }`: 노트 제목·초안·날짜와 메시지를 저장한다. 새 노트는 활성 노트 3개 제한을 검사한다.
+- `POST { action: 'record', notebook }`: 요약을 기록으로 저장하고 원문 스냅샷을 `record_messages`에 복사한 뒤 노트를 보관한다. 이미 보관된 노트를 다시 기록하면 기존 기록을 반환한다.
+- `POST { action: 'discard', id }`: 진행 중 노트의 메시지를 지우고 보관한다.
+- `POST { action: 'edit-record', note }`: 기록의 제목·과목·날짜·요약을 수정하고 `revision`을 올린다.
+- `POST { action: 'delete-original' | 'delete-record', id }`: 원문만 지우거나 기록까지 지운다.
+
+메시지 저장은 `/api/chat`과 분리되어 있다. 화면이 답변 완료 후 `save`로 노트 전체를 보낸다.
 
 DB UNIQUE는 중복 저장을 차단하지만 중복 GPT 호출 자체는 차단하지 않는다. 추론 요청의 동시 실행과 재시도 멱등성은 API 단계에서 별도로 구현한다. 이번 마이그레이션은 댓글·조회수 저장 기능을 추가하지 않는다.
