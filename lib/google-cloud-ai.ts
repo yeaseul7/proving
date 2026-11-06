@@ -13,7 +13,8 @@ const grantCookie = 'proving-cloud-grant';
 const cookieOptions = { httpOnly: true, secure: siteUrl.protocol === 'https:', sameSite: 'lax' as const, path: '/' };
 
 function config() {
-  if (runtimeMode().auth !== 'supabase') return null;
+  // 배포 사이트는 읽기 전용 블로그라 공부 대화(Gemini)를 제공하지 않는다. 다시 켤 때만 GOOGLE_CLOUD_GEMINI=on을 넣는다.
+  if (runtimeMode().auth !== 'supabase' || process.env.GOOGLE_CLOUD_GEMINI !== 'on') return null;
   const { GOOGLE_CLOUD_OAUTH_CLIENT_ID: clientId, GOOGLE_CLOUD_OAUTH_CLIENT_SECRET: secret,
     GOOGLE_CLOUD_OAUTH_COOKIE_KEY: encodedKey,
     GOOGLE_CLOUD_LOCATION: location = 'global', GOOGLE_CLOUD_GEMINI_MODEL: gemini } = process.env;

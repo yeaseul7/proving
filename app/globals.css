@@ -1025,3 +1025,8 @@ img.profile-avatar-large { object-fit: cover; background: var(--color-surface-in
 .policy-page h2 { margin: 22px 0 6px; font-size: 22px; font-weight: 500; }
 .policy-page p, .policy-page li { margin-bottom: 8px; line-height: 1.8; }
 .policy-page a { color: var(--color-accent-hover); text-decoration: underline; text-underline-offset: 3px; }
+
+/* 배포 블로그의 소유자 소개 */
+.blog-owner { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; }
+.blog-owner-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; flex: none; }
+.blog-owner h2 { margin: 0 0 4px; font-size: 22px; }

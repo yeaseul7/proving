@@ -92,3 +92,30 @@ proving의 Google 로그인은 Supabase Auth를 사용한다. Gemini용 Google C
 설정 적용 후 proving에 로그인하고 **Gemini로 시작하기**를 선택한다. 본인 Cloud 프로젝트 ID를 입력하고 Google OAuth 권한을 승인한다. 연결한 Google 계정에 프로젝트 사용 및 모델 호출 권한이 필요하다.
 
 호출은 설정한 Cloud 프로젝트에 청구된다. 사용자가 승인한 접근 토큰은 계정에 묶인 암호화 HttpOnly 쿠키에 보관하며, 최대 한 시간 또는 토큰 만료 시각까지 사용한다. 갱신 토큰을 요청하지 않으므로 만료 뒤에는 다시 연결한다.
+
+## main 푸시 전 E2E 검사
+
+저장소를 처음 받은 기기에서 아래 명령을 한 번 실행한다.
+
+```sh
+npx playwright install chromium
+git config core.hooksPath .githooks
+```
+
+이후 `git push origin main`은 프로덕션 빌드와 Playwright E2E 테스트를 먼저 실행한다. 푸시할 커밋을 체크아웃한 상태여야 하고 작업 트리는 깨끗해야 한다. 검사에 실패하면 푸시가 중단되므로 Vercel 자동 배포도 시작되지 않는다.
+
+## 개인 공부 블로그 모드 (현재 운영 방식)
+
+배포 사이트는 소유자의 공부 요약만 보여주는 **읽기 전용 블로그**다. 공부 대화는 로컬에서만 한다.
+
+- 로컬: `.env.local`의 `AUTH_PROVIDER=siwc` — ChatGPT 플랜으로 공부하고 같은 Supabase DB에 저장한다.
+- 배포: 방문자는 로그인 없이 개요·기록(제목·날짜·요약)만 본다. 원본 대화, 진행 중 노트, 초안은 공개하지 않는다(`/api/public`, `lib/public-blog.ts`). 배우는 중(채팅) 화면, `/api/chat`, Gemini 연결은 사이트에서 꺼져 있다.
+- Vercel 환경변수 `SITE_OWNER_USER_ID`: 블로그에 보여줄 소유자의 `study.users.id`.
+- 내 ChatGPT 사용자와 Google 사용자를 한 소유자로 합치기(기본은 확인만):
+
+```sh
+node --conditions=react-server --experimental-strip-types scripts/merge-owner.mjs you@gmail.com
+node --conditions=react-server --experimental-strip-types scripts/merge-owner.mjs you@gmail.com --apply
+```
+
+Gemini 대화를 다시 켜려면 `GOOGLE_CLOUD_GEMINI=on`을 넣는다. 이 경우 위의 Gemini Google Cloud OAuth 설정과 사용자별 Cloud 프로젝트가 필요하다.

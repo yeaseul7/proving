@@ -4,10 +4,13 @@ import { getAuth, requireIdentity } from '@/lib/auth';
 import { getAi } from '@/lib/ai';
 import { apiMessages, validMessages, validStoredMessages } from '@/lib/chat';
 import { cleanTitle, studyInstructions, titleInstructions } from '@/lib/prompts';
+import { runtimeMode } from '@/lib/runtime-mode';
 const busy=new Set<string>();
 export async function POST(request:Request){
   let lock:string|undefined;
   try{
+    // 배포 사이트는 읽기 전용 블로그다. 공부 대화는 로컬(ChatGPT 로그인)에서만 한다.
+    if(runtimeMode().auth==='supabase'&&process.env.GOOGLE_CLOUD_GEMINI!=='on')return Response.json({error:'이 사이트에서는 공부 대화를 제공하지 않습니다.'},{status:404,headers:{'Cache-Control':'no-store'}});
     getAuth().checkRequest(request,true);
     const identity=await requireIdentity();
     if(busy.has(identity.accountKey))return Response.json({error:'앞선 응답이 완료된 뒤 다시 보내주세요.'},{status:429});
