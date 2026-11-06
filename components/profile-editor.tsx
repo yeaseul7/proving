@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { ProfileLinks } from '@/components/profile-links';
 import { useLanguage } from '@/components/language-provider';
 import { AVATAR_MAX, AVATAR_SIZE, EMPTY_PROFILE, INTRO_MAX, NAME_MAX, type Profile } from '@/lib/profile';
 
@@ -87,37 +88,52 @@ export function ProfileEditor({ accountName = '' }: { accountName?: string }) {
     : <span className="profile-avatar-large" aria-hidden="true">{Array.from(nameOf(profile).trim())[0]?.toUpperCase() ?? 'P'}</span>;
   const startEditing = () => { if (saved) { setForm(saved); setEditing(true); setMessage(''); } };
 
-  return <section className="profile-card" aria-label={en ? 'My profile' : '내 프로필'}>
+  return <section className={saved ? "profile-card profile-card-preview" : "profile-card"} aria-label={en ? 'My profile' : '내 프로필'}>
     {!saved ? <p className="muted">{message || (en ? 'Loading profile…' : '프로필을 불러오는 중')}</p> : !editing ? <>
-      <header className="profile-header">
-        {avatar(saved)}
-        <div className="profile-identity">
-          <h2>{nameOf(saved)}</h2>
-          {publicPath && <div className="profile-share"><span className="profile-badge">{en ? 'Public' : '공개'}</span><a href={publicPath} target="_blank" rel="noopener">{publicPath}</a></div>}
+      <div className="blog-owner profile-preview">
+        <div className="blog-owner-sidebar">
+          <header className="blog-owner-header">
+            {avatar(saved)}
+            <div className="blog-owner-identity">
+              <h2>{nameOf(saved)}</h2>
+              {publicPath && <div className="profile-share"><span className="profile-badge">{en ? 'Public' : '공개'}</span><a href={publicPath} target="_blank" rel="noopener">{publicPath}</a></div>}
+            </div>
+          </header>
+          <dl className="blog-owner-visits">
+            <div><dt>{en ? 'Total visitors' : '총 방문객'}</dt><dd>—</dd></div>
+            <div><dt>{en ? 'Today' : '오늘 방문객'}</dt><dd>—</dd></div>
+          </dl>
+          <div className="profile-header-actions">
+            {publicPath && <button className="button secondary" onClick={copyLink}>{en ? 'Copy link' : '링크 복사'}</button>}
+            <button className="button secondary" onClick={startEditing}>{en ? 'Edit' : '편집'}</button>
+          </div>
         </div>
-        <div className="profile-header-actions">
-          {publicPath && <button className="button secondary" onClick={copyLink}>{en ? 'Copy link' : '링크 복사'}</button>}
-          <button className="button secondary" onClick={startEditing}>{en ? 'Edit' : '편집'}</button>
-        </div>
-      </header>
-      <div className="profile-intro">{saved.intro.trim()
-        ? <p className="profile-intro-text">{saved.intro}</p>
-        : <p className="muted">{en ? 'Add a short description about yourself.' : '나를 소개하는 짧은 설명을 적어보세요.'}</p>}</div>
-    </> : <form className="profile-form" onSubmit={save}>
-      <div className="profile-avatar-field">
-        {avatar(form)}
-        <div className="profile-avatar-actions">
-          <button type="button" className="button secondary" onClick={() => fileRef.current?.click()}>{en ? 'Choose photo' : '사진 선택'}</button>
-          {form.avatar && <button type="button" className="text-button" onClick={() => setForm({ ...form, avatar: null })}>{en ? 'Remove' : '사진 삭제'}</button>}
-          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={pickAvatar} />
+        <div className="blog-owner-intro">
+          <ProfileLinks english={en}/>
+          {saved.intro.trim()
+            ? <p className="profile-intro-text">{saved.intro}</p>
+            : <p className="muted">{en ? 'Add a short description about yourself.' : '나를 소개하는 짧은 설명을 적어보세요.'}</p>}
         </div>
       </div>
-      <label>{en ? 'Name' : '이름'}<input value={form.displayName ?? ''} maxLength={NAME_MAX} onChange={e => setForm({ ...form, displayName: e.target.value })} placeholder={en ? 'Shown on your profile' : '프로필에 보일 이름'} /></label>
-      <label>{en ? 'Description' : '설명'}<textarea value={form.intro} rows={5} maxLength={INTRO_MAX} onChange={e => setForm({ ...form, intro: e.target.value })} placeholder={en ? 'What you study and why…' : '요즘 공부하는 것과 이유를 적어보세요.'} aria-invalid={introLength > INTRO_MAX} /></label>
-      <small className={introLength > INTRO_MAX ? 'profile-error' : 'muted'}>{introLength}/{INTRO_MAX}</small>
-      <div className="profile-actions">
-        <button type="button" className="button secondary" onClick={() => { setForm(saved); setEditing(false); setMessage(''); }}>{en ? 'Cancel' : '취소'}</button>
-        <button className="button primary" disabled={busy || introLength > INTRO_MAX}>{busy ? (en ? 'Saving…' : '저장 중') : (en ? 'Save' : '저장')}</button>
+    </> : <form className="profile-form blog-owner profile-preview profile-edit" onSubmit={save}>
+      <div className="blog-owner-sidebar profile-edit-identity">
+        <div className="profile-edit-photo">
+          {avatar(form)}
+          <div className="profile-avatar-actions">
+            <button type="button" className="button secondary" onClick={() => fileRef.current?.click()}>{en ? 'Choose photo' : '사진 선택'}</button>
+            {form.avatar && <button type="button" className="text-button" onClick={() => setForm({ ...form, avatar: null })}>{en ? 'Remove' : '사진 삭제'}</button>}
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={pickAvatar} />
+          </div>
+        </div>
+        <label>{en ? 'Name' : '이름'}<input value={form.displayName ?? ''} maxLength={NAME_MAX} onChange={e => setForm({ ...form, displayName: e.target.value })} placeholder={en ? 'Shown on your profile' : '프로필에 보일 이름'} /></label>
+      </div>
+      <div className="blog-owner-intro profile-edit-description">
+        <label>{en ? 'Description' : '설명'}<textarea value={form.intro} rows={5} maxLength={INTRO_MAX} onChange={e => setForm({ ...form, intro: e.target.value })} placeholder={en ? 'What you study and why…' : '요즘 공부하는 것과 이유를 적어보세요.'} aria-invalid={introLength > INTRO_MAX} /></label>
+        <small className={introLength > INTRO_MAX ? 'profile-error' : 'muted'}>{introLength}/{INTRO_MAX}</small>
+        <div className="profile-actions">
+          <button type="button" className="button secondary" onClick={() => { setForm(saved); setEditing(false); setMessage(''); }}>{en ? 'Cancel' : '취소'}</button>
+          <button className="button primary" disabled={busy || introLength > INTRO_MAX}>{busy ? (en ? 'Saving…' : '저장 중') : (en ? 'Save' : '저장')}</button>
+        </div>
       </div>
     </form>}
     {saved && message && <p className="profile-message" role="status">{message}</p>}

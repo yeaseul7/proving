@@ -5,7 +5,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 const account = 'e2e-user';
 const answer = 'LEFT JOIN은 왼쪽 테이블의 모든 행을 유지합니다.';
-const summary = '## 핵심 개념\n\nLEFT JOIN으로 일치하지 않는 행도 조회합니다.';
+const summary = '## 핵심 개념\n\n**LEFT JOIN**으로 일치하지 않는 행도 조회합니다.';
 const question = (page: Page) => page.getByRole('textbox', { name: '공부 질문', exact: true });
 const send = (page: Page) => page.getByRole('button', { name: '질문 보내기', exact: true });
 
@@ -122,6 +122,31 @@ test('AI 오류 후 질문을 중복 추가하지 않고 재시도한다', async
   await expect(page.locator('.chat-message.user')).toHaveCount(1);
 });
 
+test('이어 공부를 열면 저장된 노트로 첫 복습 질문을 자동 요청한다', async ({ page }) => {
+  const firstReviewQuestion = '복습 질문 1. LEFT JOIN은 어느 쪽 테이블의 행을 모두 유지하나요?';
+  let reviewRequests = 0;
+  await page.route('**/api/chat', route => {
+    const body = route.request().postDataJSON();
+    const kickoff = body.messages[0]?.content ?? '';
+    if (!kickoff.includes('복습 질문 1')) return route.fallback();
+    expect(kickoff).toContain(summary);
+    expect(body.summarize).toBe(false);
+    reviewRequests += 1;
+    return route.fulfill({ json: { account, text: firstReviewQuestion } });
+  });
+
+  await page.goto('/');
+  await ask(page);
+  await page.getByRole('button', { name: '기록하기', exact: true }).click();
+  await expect(page.locator('.chat-message.user')).toHaveCount(0);
+  await page.getByRole('navigation', { name: '메인 메뉴' }).getByRole('button', { name: /기록/ }).click();
+  await page.getByRole('button', { name: /JOIN 공부/ }).click();
+  await page.getByRole('button', { name: '이어서 공부하기', exact: true }).click();
+  await expect(page.locator('.chat-message.assistant')).toHaveText(firstReviewQuestion);
+  await expect(page.getByRole('button', { name: '기록하기', exact: true })).toHaveCount(0);
+  expect(reviewRequests).toBe(1);
+});
+
 test('요약 기록과 원본을 저장하고 TXT 다운로드 후 원본만 삭제한다', async ({ page }) => {
   await page.goto('/');
   await ask(page);
@@ -131,6 +156,9 @@ test('요약 기록과 원본을 저장하고 TXT 다운로드 후 원본만 삭
   await page.getByRole('button', { name: /JOIN 공부/ }).click();
   const dialog = page.locator('.detail-dialog');
   await expect(dialog.getByRole('heading', { name: '핵심 개념' })).toBeVisible();
+  const emphasis = dialog.locator('.note-content strong');
+  await expect(emphasis).toHaveText('LEFT JOIN');
+  await expect(emphasis).toHaveCSS('font-weight', '700');
   await dialog.getByRole('tab', { name: '원본 대화', exact: true }).click();
   await expect(dialog.getByLabel('원본 대화 텍스트')).toContainText(answer);
   await dialog.locator('summary').click();
@@ -363,33 +391,10 @@ test('개요에서 이름·프로필 사진·500자 설명만 편집하고 기�
   await expect(card.getByRole('link', { name: '/u/yeaseul' })).toBeVisible();
 });
 
-test('사용자 Cloud 프로젝트를 OAuth로 연결해 Gemini에 질문한다', async ({ page }) => {
-  let connected = false;
-  await page.route('**/auth/google-cloud?*', route => {
-    expect(new URL(route.request().url()).searchParams.get('project')).toBe('my-study-project');
-    connected = true;
-    return route.fulfill({ status: 302, headers: { location: '/' } });
-  });
-  await page.route('**/api/session', route => route.fulfill({ json: {
-    account, name: '테스트 사용자', canChat: false, provider: 'google',
-    cloudAi: { enabled: true, models: connected ? [
-      { id: 'cloud:gemini', name: 'Gemini (Google Cloud)', provider: 'gemini' },
-    ] : [] },
-  } }));
-  const called: string[] = [];
-  await page.route('**/api/chat', route => {
-    const { model } = route.request().postDataJSON();
-    called.push(model);
-    return route.fulfill({ json: { text: model, account } });
-  });
+test('공개 모드에서는 계정 로그인 버튼과 개인 메뉴를 표시하지 않는다', async ({ page }) => {
+  await page.route('**/api/session', route => route.fulfill({ json: { account: null, provider: 'public', aiMode: 'none' } }));
   await page.goto('/');
-  const picker = page.getByRole('group', { name: 'AI 선택' });
-  await picker.getByRole('button', { name: /Gemini로 시작하기/ }).click();
-  await expect(picker.getByRole('button', { name: /Claude|GPT/ })).toHaveCount(0);
-  await page.getByLabel('본인 Google Cloud 프로젝트 ID').fill('my-study-project');
-  await page.getByRole('button', { name: 'Google로 연결' }).click();
-  await question(page).fill('첫 질문');
-  await send(page).click();
-  await expect(page.locator('.chat-message.assistant')).toHaveText('cloud:gemini');
-  expect(called).toEqual(['cloud:gemini']);
+  await expect(page.getByText('공부 채팅은 로컬 앱에서 이용할 수 있어요.')).toBeVisible();
+  await expect(page.locator('a[href="/auth/login"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '개요', exact: true })).toHaveCount(0);
 });

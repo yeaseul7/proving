@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 nextEnv.loadEnvConfig(process.cwd(), true, { info() {}, error() {} });
 const apply = process.argv.includes('--apply');
-const names = ['devices', 'link_codes', 'messages', 'notebooks', 'profiles', 'record_messages', 'study_records', 'user_identities', 'users'];
+const names = ['blog_visitors', 'devices', 'link_codes', 'messages', 'notebooks', 'profiles', 'record_messages', 'study_records', 'user_identities', 'users'];
 const applied = [];
 let pool;
 let client;
@@ -139,7 +139,8 @@ try {
       EXISTS(SELECT 1 FROM pg_namespace WHERE nspname='study') AS schema,
       to_regclass('study.profiles') IS NOT NULL AS profiles,
       to_regclass('study.user_identities') IS NOT NULL AS identities,
-      EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='study' AND table_name='profiles' AND column_name='avatar') AS avatar`);
+      EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='study' AND table_name='profiles' AND column_name='avatar') AS avatar,
+      to_regclass('study.blog_visitors') IS NOT NULL AS visitors`);
     // SQL 파일은 단독 실행도 가능하다. 이 실행기에서는 검증까지 같은 트랜잭션에 넣는다.
     await client.query('BEGIN');
     if (!state.schema) {
@@ -169,6 +170,11 @@ try {
       phase = 'constraint verification 004';
       await verifyAvatarConstraints();
       applied.push('004_profile_avatar');
+    }
+    if (!state.visitors) {
+      phase = 'migration 005';
+      await client.query(migration('005_blog_visitors.sql'));
+      applied.push('005_blog_visitors');
     }
   }
 

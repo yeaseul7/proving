@@ -9,7 +9,7 @@ export type Identity = {
 };
 
 export interface AuthProvider {
-  readonly provider: IdentityProvider;
+  readonly provider: 'chatgpt' | 'public';
   // 요청 출처 검사. 실패 시 SiwcError(403)를 던진다.
   checkRequest(request: Request, mutation?: boolean): void;
   getIdentity(): Promise<Identity | null>;

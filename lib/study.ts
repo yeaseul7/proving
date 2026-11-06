@@ -1,6 +1,6 @@
 import { validStoredMessages, type ChatMessage } from './chat.ts';
 
-export type StudyNote = { id: string; title: string; date: string; subject: string; content: string; updatedAt: string; ownerId?: string; cloud?: true; views?: number; comments?: {id:string;author:string;content:string;createdAt:string}[]; messages?: ChatMessage[] };
+export type StudyNote = { id: string; title: string; date: string; subject: string; content: string; updatedAt: string; ownerId?: string; cloud?: true; views?: number; messages?: ChatMessage[] };
 export const STORAGE_KEY = 'study-leaf-notes-v1';
 export function dateKey(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
@@ -8,7 +8,7 @@ export function dateKey(date = new Date()): string {
 export function isStudyNote(value: unknown): value is StudyNote {
   if (!value || typeof value !== 'object') return false;
   const n = value as Record<string, unknown>;
-  return ['id','title','subject','content','updatedAt'].every(k => typeof n[k] === 'string') && typeof n.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(n.date) && dateKey(new Date(`${n.date}T12:00:00`)) === n.date && (n.ownerId === undefined || typeof n.ownerId === 'string') && (n.views === undefined || (Number.isSafeInteger(n.views) && (n.views as number)>=0)) && (n.comments === undefined || (Array.isArray(n.comments) && n.comments.every(c=>c && ['id','author','content','createdAt'].every(k=>typeof c[k]==='string')))) && (n.messages === undefined || validStoredMessages(n.messages));
+  return ['id','title','subject','content','updatedAt'].every(k => typeof n[k] === 'string') && typeof n.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(n.date) && dateKey(new Date(`${n.date}T12:00:00`)) === n.date && (n.ownerId === undefined || typeof n.ownerId === 'string') && (n.views === undefined || (Number.isSafeInteger(n.views) && (n.views as number)>=0)) && (n.messages === undefined || validStoredMessages(n.messages));
 }
 export function streak(notes: StudyNote[], today: string): number {
   const days = new Set(notes.map(n => n.date));
