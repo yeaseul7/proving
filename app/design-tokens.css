@@ -26,8 +26,12 @@
   --color-egg-border: var(--color-accent-border);
   --color-egg-surface: var(--color-accent-soft);
   --color-egg-focus: var(--color-accent);
+  --color-on-bookmark: #173d78;
+  --color-note-text: #4b4e52;
+  --color-note-strong: #3f4246;
+  --color-note-marker: #696d72;
 
-  --font-body: var(--font-ongeulip-haewon), 'Apple SD Gothic Neo', sans-serif;
+  --font-body: var(--font-handwriting), 'Apple SD Gothic Neo', sans-serif;
   --text-xs: 13px;
   --text-sm: 15px;
   --text-base: 18px;
@@ -62,4 +66,43 @@
   --color-code-number: #ab562c;
   --color-code-function: #245fa4;
   --color-code-comment: #6c7d89;
+}
+
+/* Dark theme: data-theme is set before paint from the saved choice or the system setting. */
+:root[data-theme=dark] {
+  color-scheme: dark;
+  --color-canvas: #16191e;
+  --color-paper: #1f2329;
+  --color-surface: #23272e;
+  --color-surface-inset: #1b1e23;
+  --color-text: #e2e6eb;
+  --color-text-muted: #a3adb7;
+  --color-text-subtle: #8b96a1;
+  --color-accent: #6b9ef2;
+  --color-accent-hover: #91b8f7;
+  --color-accent-soft: #1f2b3f;
+  --color-accent-soft-hover: #273752;
+  --color-accent-border: #3b5683;
+  --color-focus: #7aa8f4;
+  --color-on-accent: #fff;
+  --color-border: #2f343c;
+  --color-border-strong: #3e454e;
+  --color-danger: #d79a8a;
+  --color-overlay: #000000a0;
+  --color-code: #2a2f37;
+  --color-bookmark-1: #3a6cc2;
+  --color-bookmark-2: #4579cf;
+  --color-bookmark-3: #5687d9;
+  --color-egg-empty: #23272e;
+  --color-on-bookmark: #eef4ff;
+  --color-note-text: #c9ced4;
+  --color-note-strong: #dde1e6;
+  --color-note-marker: #9aa1a8;
+  --color-code-surface: #1b1f25;
+  --color-code-header: #252a31;
+  --color-code-keyword: #c3a2f0;
+  --color-code-string: #8fd1ae;
+  --color-code-number: #eaa27c;
+  --color-code-function: #8bbaf5;
+  --color-code-comment: #8492a0;
 }
