@@ -9,7 +9,6 @@ import { NoteDownload } from '@/components/note-download';
 import { EmptyNotebook } from '@/components/empty-notebook';
 import { EggGarden } from '@/components/egg-garden';
 import { ProfileEditor } from '@/components/profile-editor';
-import { DeviceLinks } from '@/components/device-links';
 import { StudyMarkdown } from '@/components/study-markdown';
 import { writeStudy, type StoredStudyNote } from '@/lib/study-sync-client';
 import { StudyChat, type Account } from '@/components/study-chat';
@@ -221,7 +220,6 @@ export default function Home() {
     <main>
     {signedIn&&view==='home'&&<>
       <ProfileEditor accountName={accountName}/>
-      <DeviceLinks/>
       <section className="stats" aria-label={t('공부 통계')}>
         <article><p>{language==='ko'?'연속':'Streak'}</p><strong>{today?streak(notes,today):0}<small>{language==='ko'?'일':today&&streak(notes,today)===1?'day':'days'}</small></strong></article>
         <article><p>{language==='ko'?`${month.getMonth()+1}월 횟수`:`${month.toLocaleDateString('en-US',{month:'short'})} sessions`}</p><strong>{monthNotes.length}<small>{language==='ko'?'회':monthNotes.length===1?'session':'sessions'}</small></strong></article>

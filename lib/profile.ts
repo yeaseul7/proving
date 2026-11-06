@@ -1,26 +1,29 @@
-export type Profile = { handle: string | null; displayName: string | null; intro: string; isPublic: boolean };
-export type PublicProfile = { handle: string; displayName: string; intro: string; updatedAt: string; counts: Record<string, number> };
+export type Profile = { handle: string | null; displayName: string | null; avatar: string | null; intro: string; isPublic: boolean };
+export type ProfileInput = Pick<Profile, 'displayName' | 'avatar' | 'intro'>;
+export type PublicProfile = { handle: string; displayName: string; avatar: string | null; intro: string; updatedAt: string; counts: Record<string, number> };
 
 export const HANDLE_PATTERN = /^[a-z0-9_]{3,20}$/;
 export const NAME_MAX = 40;
-export const INTRO_MAX = 5000;
-// 아직 저장하지 않은 프로필은 공개가 기본이다. 공개하려면 아이디가 필요해 처음 저장할 때 정한다.
-export const EMPTY_PROFILE: Profile = { handle: null, displayName: null, intro: '', isPublic: true };
+export const INTRO_MAX = 500;
+// 프로필 사진은 브라우저에서 256px로 줄인 data URL로 저장한다. SVG는 받지 않는다.
+export const AVATAR_SIZE = 256;
+export const AVATAR_MAX = 200_000;
+export const AVATAR_PATTERN = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+export const EMPTY_PROFILE: Profile = { handle: null, displayName: null, avatar: null, intro: '', isPublic: false };
 
-// 브라우저 입력을 DB 제약과 같은 규칙으로 정리한다. 실패 시 사용자에게 보여줄 문구를 반환한다.
-export function parseProfileInput(input: unknown): Profile | string {
+// 편집 화면에서 바꿀 수 있는 이름·사진·설명만 정리한다. 실패 시 사용자에게 보여줄 문구를 반환한다.
+export function parseProfileInput(input: unknown): ProfileInput | string {
   if (!input || typeof input !== 'object') return '프로필 입력이 올바르지 않습니다.';
-  const { handle, displayName, intro, isPublic } = input as Record<string, unknown>;
-  if (handle !== null && typeof handle !== 'string') return '아이디가 올바르지 않습니다.';
-  if (displayName !== null && typeof displayName !== 'string') return '이름이 올바르지 않습니다.';
-  if (typeof intro !== 'string' || typeof isPublic !== 'boolean') return '프로필 입력이 올바르지 않습니다.';
-  const cleanHandle = handle?.trim().toLowerCase() || null;
+  const { displayName, avatar, intro } = input as Record<string, unknown>;
+  if (displayName != null && typeof displayName !== 'string') return '이름이 올바르지 않습니다.';
+  if (avatar != null && typeof avatar !== 'string') return '프로필 사진이 올바르지 않습니다.';
+  if (typeof intro !== 'string') return '프로필 입력이 올바르지 않습니다.';
   const cleanName = displayName?.trim() || null;
-  if (cleanHandle && !HANDLE_PATTERN.test(cleanHandle)) return '아이디는 영문 소문자·숫자·밑줄 3~20자로 정해주세요.';
+  const cleanAvatar = avatar || null;
   if (cleanName && Array.from(cleanName).length > NAME_MAX) return `이름은 ${NAME_MAX}자까지 쓸 수 있어요.`;
-  if (intro.length > INTRO_MAX) return `소개글은 ${INTRO_MAX}자까지 쓸 수 있어요.`;
-  if (isPublic && !cleanHandle) return '프로필을 공개하려면 아이디를 정해주세요.';
-  return { handle: cleanHandle, displayName: cleanName, intro, isPublic };
+  if (cleanAvatar && (cleanAvatar.length > AVATAR_MAX || !AVATAR_PATTERN.test(cleanAvatar))) return '프로필 사진은 JPG·PNG·WebP 이미지만 올릴 수 있어요.';
+  if (Array.from(intro).length > INTRO_MAX) return `설명은 ${INTRO_MAX}자까지 쓸 수 있어요.`;
+  return { displayName: cleanName, avatar: cleanAvatar, intro };
 }
 
 // meta description용 평문. Markdown 기호·코드·수식을 걷어내고 길이를 제한한다.

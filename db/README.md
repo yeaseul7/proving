@@ -12,7 +12,7 @@ node --conditions=react-server --experimental-strip-types scripts/db-schema.mjs 
 node --conditions=react-server --experimental-strip-types scripts/db-schema.mjs
 ```
 
-`.env.local`의 기존 `DATABASE_URL`, `SUPABASE_CA_PATH`와 `lib/db.ts`를 사용한다. 인증 정보는 출력하지 않는다. `--apply`는 아직 적용하지 않은 마이그레이션(`001_initial_schema`, `002_profiles`)만 순서대로 적용하고 제약을 검증한 뒤 커밋한다. 이미 있는 테이블은 수정·삭제·재초기화하지 않는다. SQL 파일은 자체 트랜잭션도 포함하므로 SQL 클라이언트에서 독립 실행할 수 있다.
+`.env.local`의 기존 `DATABASE_URL`, `SUPABASE_CA_PATH`와 `lib/db.ts`를 사용한다. 인증 정보는 출력하지 않는다. `--apply`는 아직 적용하지 않은 마이그레이션(`001_initial_schema` ~ `004_profile_avatar`)만 순서대로 적용하고 제약을 검증한 뒤 커밋한다. 이미 있는 테이블은 수정·삭제·재초기화하지 않는다. SQL 파일은 자체 트랜잭션도 포함하므로 SQL 클라이언트에서 독립 실행할 수 있다.
 
 검증 데이터는 SAVEPOINT 내에서만 생성하고 전부 롤백한다. 소유권 외래키, 메시지 키·순서 중복, 기록 중복, JSONB 형태, 원본 메시지와 기록의 노트 일치를 검사한다. 적용 과정에서 오류가 나면 전체 DDL도 롤백한다. 진단에는 SQLSTATE·제약 이름·테이블 등만 포함하며, 원문 오류의 입력값·상세 행·접속 주소는 생략한다.
 
@@ -22,7 +22,7 @@ node --conditions=react-server --experimental-strip-types scripts/db-schema.mjs
 - `notebooks`: 사용자 소유 노트와 초안. `active`/`archived`로 상태를 구분한다.
 - `messages`: 노트의 대화. `(notebook_id, user_id)` 복합 외래키가 소유자 불일치를 거부한다. 재전송 시 같은 `client_message_id`를 사용한다. 본문이 같아도 별도의 질문은 허용한다.
 - `study_records`: 노트당 하나의 기록. 반복 요약은 같은 기록을 갱신하고 `revision`을 증가시킨다. `(user_id, idempotency_key)`로 동일 저장 요청의 중복 생성을 차단한다.
-- `profiles`: 사용자별 공개 프로필. 아이디(`handle`, 소문자·숫자·밑줄 3~20자, 고유), 이름, Markdown 소개글(5000자), 공개 여부. 아이디 없이 공개할 수 없다. 공개 페이지 `/u/<handle>`은 소개글과 날짜별 기록 개수만 읽고 노트 제목·내용은 읽지 않는다.
+- `profiles`: 사용자별 공개 프로필. 아이디(`handle`, 소문자·숫자·밑줄 3~20자, 고유), 이름, 프로필 사진(`avatar`, 256px JPG·PNG·WebP data URL), 설명(DB 5000자, API 500자), 공개 여부. 편집 화면은 이름·사진·설명만 바꾼다. 아이디 없이 공개할 수 없다. 공개 페이지 `/u/<handle>`은 소개글과 날짜별 기록 개수만 읽고 노트 제목·내용은 읽지 않는다.
 - `record_messages`: 기록 시점의 원문 스냅샷. 기록과 메시지 모두 같은 사용자·노트에 속해야 한다. 같은 원본 메시지 또는 순서를 한 기록에 중복 등록할 수 없다. 스냅샷은 API에서 원본 메시지를 SELECT해 복사해야 한다.
 
 JSONB 기본 형식:

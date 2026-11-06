@@ -2,17 +2,18 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { introDescription, parseProfileInput } from '../lib/profile.ts';
 
-test('프로필 입력은 아이디를 소문자로 정리하고 공개 조건과 길이를 검사한다', () => {
-  assert.deepEqual(parseProfileInput({ handle: ' Yea_Seul7 ', displayName: ' 예슬 ', intro: '## 안녕', isPublic: true }),
-    { handle: 'yea_seul7', displayName: '예슬', intro: '## 안녕', isPublic: true });
-  assert.deepEqual(parseProfileInput({ handle: '', displayName: '', intro: '', isPublic: false }),
-    { handle: null, displayName: null, intro: '', isPublic: false });
-  assert.equal(typeof parseProfileInput({ handle: 'ab', displayName: null, intro: '', isPublic: false }), 'string');
-  assert.equal(typeof parseProfileInput({ handle: 'has-dash', displayName: null, intro: '', isPublic: false }), 'string');
-  assert.equal(typeof parseProfileInput({ handle: null, displayName: null, intro: '', isPublic: true }), 'string');
-  assert.equal(typeof parseProfileInput({ handle: 'okay', displayName: null, intro: 'x'.repeat(5001), isPublic: false }), 'string');
-  assert.equal(typeof parseProfileInput({ handle: 'okay', displayName: '가'.repeat(41), intro: '', isPublic: false }), 'string');
-  assert.equal(typeof parseProfileInput({ handle: 'okay', intro: '', isPublic: 'yes' }), 'string');
+test('프로필 입력은 이름·사진·설명만 받고 길이와 이미지 형식을 검사한다', () => {
+  const png = 'data:image/png;base64,iVBORw0KGgo=';
+  assert.deepEqual(parseProfileInput({ displayName: ' 예슬 ', avatar: png, intro: '안녕', handle: 'ignored', isPublic: true }),
+    { displayName: '예슬', avatar: png, intro: '안녕' });
+  assert.deepEqual(parseProfileInput({ displayName: '', avatar: '', intro: '' }), { displayName: null, avatar: null, intro: '' });
+  assert.deepEqual(parseProfileInput({ displayName: null, avatar: null, intro: '가'.repeat(500) }), { displayName: null, avatar: null, intro: '가'.repeat(500) });
+  assert.equal(typeof parseProfileInput({ displayName: null, avatar: null, intro: '가'.repeat(501) }), 'string');
+  assert.equal(typeof parseProfileInput({ displayName: '가'.repeat(41), avatar: null, intro: '' }), 'string');
+  assert.equal(typeof parseProfileInput({ displayName: null, avatar: 'data:image/svg+xml;base64,PHN2Zz4=', intro: '' }), 'string');
+  assert.equal(typeof parseProfileInput({ displayName: null, avatar: 'https://example.com/a.png', intro: '' }), 'string');
+  assert.equal(typeof parseProfileInput({ displayName: null, avatar: `data:image/png;base64,${'A'.repeat(200_001)}`, intro: '' }), 'string');
+  assert.equal(typeof parseProfileInput({ displayName: null, intro: 1 }), 'string');
   assert.equal(typeof parseProfileInput(null), 'string');
 });
 

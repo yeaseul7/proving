@@ -126,7 +126,12 @@ export async function cloudResponder(account: string) {
       body: JSON.stringify(body),
     });
     if (result.status === 401) throw new CloudAiError('Google Cloud 연결이 만료되었습니다. 다시 연결해주세요.', 401, 'cloud_auth_required');
-    if ([400, 403, 404].includes(result.status)) throw new CloudAiError('Google Cloud의 프로젝트 권한, 결제, 모델 활성화와 리전을 확인해주세요.', result.status, 'cloud_access');
+    if ([400, 403, 404].includes(result.status)) {
+      // Google이 알려준 실제 원인(API 미사용, 결제, 모델 없음 등)을 서버 로그에 남긴다. 토큰은 포함하지 않는다.
+      const detail = await result.json().catch(() => null) as { error?: { status?: string; message?: string } } | null;
+      console.error('vertex ai rejected', { status: result.status, reason: detail?.error?.status, message: detail?.error?.message?.slice(0, 500), model: settings.gemini, location: settings.location });
+      throw new CloudAiError('Google Cloud의 프로젝트 권한, 결제, 모델 활성화와 리전을 확인해주세요.', result.status, 'cloud_access');
+    }
     if (result.status === 429) throw new CloudAiError('Google Cloud 모델의 요청 한도에 도달했습니다.', 429, 'cloud_limit');
     if (!result.ok) throw new CloudAiError('Google Cloud 응답을 받지 못했습니다. 다시 시도해주세요.', 503, 'cloud_unavailable');
     const data = await result.json();

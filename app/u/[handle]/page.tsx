@@ -3,7 +3,6 @@ import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { connection } from 'next/server';
 import { EggGarden } from '@/components/egg-garden';
-import { StudyMarkdown } from '@/components/study-markdown';
 import { introDescription } from '@/lib/profile';
 import { getPublicProfile, seoulToday } from '@/lib/public-profile';
 import { siteUrl } from '@/lib/site';
@@ -56,12 +55,15 @@ export default async function PublicProfilePage({ params }: Props) {
         <Image src="/proving-logo.png" alt="Proving" width={1306} height={428} sizes="120px" className="brand-logo brand-logo-light" />
         <Image src="/proving-logo-dark.png" alt="" width={1306} height={428} sizes="120px" className="brand-logo brand-logo-dark" />
       </a>
+      {/* data URL이라 next/image 최적화가 필요 없다. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {profile.avatar && <img className="public-profile-avatar" src={profile.avatar} alt="" width={72} height={72} />}
       <h1>{profile.displayName}</h1>
       <p className="public-profile-handle">@{profile.handle} · 최근 1년 기록 {total}개</p>
     </header>
     {profile.intro.trim()
-      ? <section className="public-profile-intro" aria-label="소개"><StudyMarkdown>{profile.intro}</StudyMarkdown></section>
-      : <p className="public-profile-empty">아직 소개글이 없어요.</p>}
+      ? <section className="public-profile-intro" aria-label="소개"><p className="profile-intro-text">{profile.intro}</p></section>
+      : <p className="public-profile-empty">아직 설명이 없어요.</p>}
     <EggGarden counts={profile.counts} today={seoulToday()} />
   </main>;
 }

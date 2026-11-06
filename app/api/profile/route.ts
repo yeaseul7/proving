@@ -28,7 +28,7 @@ async function handle(request: Request, write: boolean) {
     let input;
     try {
       const raw = await request.text();
-      if (raw.length > 20_000) return json({ error: '소개글이 너무 깁니다.' }, 413);
+      if (raw.length > 220_000) return json({ error: '프로필 사진이나 설명이 너무 큽니다.' }, 413);
       input = parseProfileInput(JSON.parse(raw));
     } catch { return json({ error: '프로필 입력이 올바르지 않습니다.' }, 400); }
     if (typeof input === 'string') return json({ error: input }, 400);

@@ -332,31 +332,35 @@ test('개요는 최근·선택한 날짜의 노트를 3개까지만 보여주고
   await expect(rows).toHaveCount(5);
 });
 
-test('개요에서 Markdown 소개글과 공개 아이디를 저장하고 프로필 링크를 보여준다', async ({ page }) => {
-  let profile = { handle: null as string | null, displayName: null as string | null, intro: '', isPublic: true };
+test('개요에서 이름·프로필 사진·500자 설명만 편집하고 기존 공개 링크는 유지한다', async ({ page }) => {
+  let profile: Record<string, unknown> = { handle: 'yeaseul', displayName: null, avatar: null, intro: '', isPublic: true };
+  let sent: Record<string, unknown> = {};
   await page.route('**/api/profile', async route => {
-    if (route.request().method() === 'PUT') profile = route.request().postDataJSON();
+    if (route.request().method() === 'PUT') { sent = route.request().postDataJSON(); profile = { ...profile, ...sent }; }
     return route.fulfill({ json: { profile } });
   });
   await page.goto('/');
   await page.getByRole('navigation', { name: '메인 메뉴' }).getByRole('button', { name: '개요', exact: true }).click();
   const card = page.getByRole('region', { name: '내 프로필' });
-  await expect(card.getByRole('heading', { name: '내 프로필' })).toHaveCount(0);
-  await expect(card.getByText('아이디를 정하면 공개돼요')).toBeVisible();
   await card.getByRole('button', { name: '편집' }).click();
-  await expect(card.getByLabel(/공개하기/)).toBeChecked();
+  await expect(card.getByLabel('아이디')).toHaveCount(0);
+  await expect(card.getByLabel(/공개하기/)).toHaveCount(0);
   await card.getByLabel('이름').fill('예슬');
-  await card.getByLabel('아이디').fill('Bad-ID');
-  await expect(card.getByText('영문 소문자·숫자·밑줄 3~20자')).toBeVisible();
-  await card.getByLabel('아이디').fill('Yeaseul');
-  await card.getByRole('textbox', { name: '소개글' }).fill('## 안녕하세요\n\n**SQL**을 공부해요.');
-  await card.getByRole('button', { name: '미리보기' }).click();
-  await expect(card.getByRole('heading', { name: '안녕하세요' })).toBeVisible();
-  await card.getByLabel(/공개하기/).check();
+  const description = card.getByRole('textbox', { name: '설명' });
+  await description.fill('가'.repeat(600));
+  await expect(description).toHaveValue('가'.repeat(500));
+  await expect(card.getByText('500/500')).toBeVisible();
+  await description.fill('SQL을 공부해요.');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  await card.locator('input[type=file]').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: png });
+  await expect(card.locator('img.profile-avatar-large')).toBeVisible();
   await card.getByRole('button', { name: '저장' }).click();
+  expect(Object.keys(sent).sort()).toEqual(['avatar', 'displayName', 'intro']);
+  expect(sent).toMatchObject({ displayName: '예슬', intro: 'SQL을 공부해요.' });
+  expect(String(sent.avatar)).toMatch(/^data:image\/(webp|jpeg);base64,/);
+  await expect(card.getByRole('heading', { name: '예슬' })).toBeVisible();
+  await expect(card.getByText('SQL을 공부해요.')).toBeVisible();
   await expect(card.getByRole('link', { name: '/u/yeaseul' })).toBeVisible();
-  expect(profile).toMatchObject({ handle: 'yeaseul', displayName: '예슬', isPublic: true });
-  await expect(card.locator('strong', { hasText: 'SQL' })).toBeVisible();
 });
 
 test('사용자 Cloud 프로젝트를 OAuth로 연결해 Gemini에 질문한다', async ({ page }) => {

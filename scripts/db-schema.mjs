@@ -53,6 +53,21 @@ async function verifyProfileConstraints() {
   }
 }
 
+async function verifyAvatarConstraints() {
+  await client.query('SAVEPOINT avatar_rows');
+  try {
+    const owner = randomUUID();
+    await client.query('INSERT INTO study.users(id, oauth_account_id) VALUES ($1, $2)', [owner, owner.replaceAll('-', '').repeat(2)]);
+    const avatarSql = 'INSERT INTO study.profiles(user_id, avatar) VALUES ($1, $2)';
+    await expectRejected(avatarSql, [owner, 'data:image/svg+xml;base64,PHN2Zz4='], '23514');
+    await expectRejected(avatarSql, [owner, 'https://example.com/a.png'], '23514');
+    await client.query(avatarSql, [owner, 'data:image/png;base64,iVBORw0KGgo=']);
+  } finally {
+    await client.query('ROLLBACK TO SAVEPOINT avatar_rows');
+    await client.query('RELEASE SAVEPOINT avatar_rows');
+  }
+}
+
 async function verifyIdentityConstraints() {
   const { rows: [{ missing }] } = await client.query(`SELECT count(*)::int AS missing FROM study.users u
     WHERE u.oauth_account_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM study.user_identities i
@@ -123,7 +138,8 @@ try {
     const { rows: [state] } = await client.query(`SELECT
       EXISTS(SELECT 1 FROM pg_namespace WHERE nspname='study') AS schema,
       to_regclass('study.profiles') IS NOT NULL AS profiles,
-      to_regclass('study.user_identities') IS NOT NULL AS identities`);
+      to_regclass('study.user_identities') IS NOT NULL AS identities,
+      EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='study' AND table_name='profiles' AND column_name='avatar') AS avatar`);
     // SQL 파일은 단독 실행도 가능하다. 이 실행기에서는 검증까지 같은 트랜잭션에 넣는다.
     await client.query('BEGIN');
     if (!state.schema) {
@@ -146,6 +162,13 @@ try {
       phase = 'constraint verification 003';
       await verifyIdentityConstraints();
       applied.push('003_identities_devices');
+    }
+    if (!state.avatar) {
+      phase = 'migration 004';
+      await client.query(migration('004_profile_avatar.sql'));
+      phase = 'constraint verification 004';
+      await verifyAvatarConstraints();
+      applied.push('004_profile_avatar');
     }
   }
 
