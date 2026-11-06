@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$remote_ref" = refs/heads/main ] || continue
+  [ "$local_ref" != '(delete)' ] || continue
+
+  if [ "$local_sha" != "$(git rev-parse HEAD)" ] || [ -n "$(git status --porcelain)" ]; then
+    echo 'main 푸시 전에는 푸시할 커밋을 체크아웃하고 작업 트리를 정리해주세요.' >&2
+    exit 1
+  fi
+
+  echo 'main 푸시 전 빌드 및 E2E 테스트를 실행합니다.'
+  npm run test:e2e </dev/null
+  break
+done
