@@ -17,8 +17,16 @@ import { StudyChat, type Account } from '@/components/study-chat';
 type View = 'home' | 'notes' | 'connect';
 const homeLimit = 3;
 type FontMode = 'readable' | 'handwriting';
-const fontModesStorageKey = 'proving-font-modes';
+const fontModeStorageKey = 'proving-font-mode';
 const fontModes: FontMode[] = ['readable', 'handwriting'];
+type Theme = 'light' | 'dark';
+const themeStorageKey = 'proving-theme';
+function ThemeIcon({name}: {name: Theme}) {
+  return <svg className="pref-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{name==='dark'?<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z"/>:<><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/></>}</svg>;
+}
+function PrefIcon({name}: {name: FontMode}) {
+  return <svg className="pref-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{name==='readable'?<path d="M4 19 9 5l5 14M6 14h6M15 19v-6.5a2.5 2.5 0 0 1 5 0V19m-5-3.5h5"/>:<path d="m14.5 5.5 4 4M4 20l1-5L16 4a2.1 2.1 0 0 1 3 3L8 18l-4 2Z"/>}</svg>;
+}
 function Icon({name, size=20}: {name: string; size?: number}) {
   if(name==='egg')return <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M8 6c3-3 6 0 9-1 5-2 9 2 8 6-1 3 5 5 3 9-2 4-5 3-7 6-3 3-6 0-9 1-4 0-5-4-8-6-3-4 1-6 1-9 0-3 1-5 3-6Z" fill="#fffaf0" stroke="#b7aa8b" strokeWidth="1.4"/><circle cx="16" cy="16" r="6" fill="#eebd45"/><path d="M13 13c1-1 2-1.5 3-1.5" stroke="#fff1b1" strokeWidth="1.2" strokeLinecap="round"/></svg>;
   const paths: Record<string, React.ReactNode> = {
@@ -41,23 +49,23 @@ const emptyDraft = (date: string) => ({title:'', date, subject:'',  content:''})
 export default function Home() {
   const {language,setLanguage,t}=useLanguage();
   const [view,setView]=useState<View>('connect');
-  const [viewFontModes, setViewFontModes] = useState<Partial<Record<View, FontMode>>>({});
-  const fontMode = viewFontModes[view] ?? 'handwriting';
-  useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(fontModesStorageKey) ?? '{}');
-      const next: Partial<Record<View, FontMode>> = {};
-      for (const screen of ['connect', 'home', 'notes'] as const) {
-        if (fontModes.includes(stored?.[screen])) next[screen] = stored[screen];
-      }
-      setViewFontModes(next);
-    } catch { /* 브라우저 설정을 읽을 수 없으면 기본 글꼴을 사용한다. */ }
-  }, []);
+  const [fontMode, setFontMode] = useState<FontMode>('handwriting');
+  // The layout's head script already applied the saved mode to <html>; sync state from it.
+  useEffect(() => { if (document.documentElement.dataset.fontMode === 'readable') setFontMode('readable'); }, []);
+
+  const [theme, setTheme] = useState<Theme>('light');
+  useEffect(() => { if (document.documentElement.dataset.theme === 'dark') setTheme('dark'); }, []);
+  function toggleTheme() {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem(themeStorageKey, next); } catch {}
+  }
 
   function selectFontMode(mode: FontMode) {
-    const next = { ...viewFontModes, [view]: mode };
-    setViewFontModes(next);
-    try { localStorage.setItem(fontModesStorageKey, JSON.stringify(next)); } catch {}
+    setFontMode(mode);
+    document.documentElement.dataset.fontMode = mode;
+    try { localStorage.setItem(fontModeStorageKey, mode); } catch {}
   }
   const [notes,setNotes]=useState<StudyNote[]>([]);
   const [ready,setReady]=useState(false);
@@ -190,35 +198,36 @@ export default function Home() {
   function showMore(){setView('notes');setSearch('');setSubject('전체');}
   function changeView(next:View){if(next!=='connect'&&!signedIn)return;setView(next);setSelectedDay(null);setSearch('');setSubject('전체');}
   const ownsDetail=Boolean(accountId&&detail?.ownerId===accountId);
-  return <div className={`app-shell ${view==='connect'?'study-layout':''}`} data-font-mode={fontMode}>
-    <aside className="sidebar"><a className="brand" href="/" aria-label={t('proving 홈')}><Image src="/proving-logo.png" alt="Proving" width={1630} height={526} sizes="140px" className="brand-logo" /></a><nav aria-label={t('메인 메뉴')}>{([{id:'connect',icon:'chat',label:t('배우는 중')},{id:'home',icon:'egg',label:t('개요')},{id:'notes',icon:'books',label:t('기록')}] as const).filter(item=>signedIn||item.id==='connect').map(item=><button key={item.id} className={view===item.id?'nav-item active':'nav-item'} onClick={()=>changeView(item.id)}><Icon name={item.icon}/>{item.label}{item.id==='notes'&&<span className="nav-count">{notes.length}</span>}</button>)}</nav><div className="sidebar-bottom">
+  return <div className={`app-shell ${view==='connect'?'study-layout':''}`}>
+    <aside className="sidebar"><a className="brand" href="/" aria-label={t('proving 홈')}><Image src="/proving-logo.png" alt="Proving" width={1306} height={428} sizes="140px" className="brand-logo brand-logo-light" /><Image src="/proving-logo-dark.png" alt="" width={1306} height={428} sizes="140px" className="brand-logo brand-logo-dark" /></a><nav aria-label={t('메인 메뉴')}>{([{id:'connect',icon:'chat',label:t('배우는 중')},{id:'home',icon:'egg',label:t('개요')},{id:'notes',icon:'books',label:t('기록')}] as const).filter(item=>signedIn||item.id==='connect').map(item=><button key={item.id} className={view===item.id?'nav-item active':'nav-item'} onClick={()=>changeView(item.id)}><Icon name={item.icon}/>{item.label}{item.id==='notes'&&<span className="nav-count">{notes.length}</span>}</button>)}</nav><div className="sidebar-bottom">
       <div className="sidebar-preferences">
-        <div className="language-switch font-mode-switch" data-font-mode={fontMode} role="group" aria-label={language==='ko'?'이 화면의 글꼴 모드':'Font mode for this screen'}>
+        <div className="language-switch font-mode-switch" role="group" aria-label={language==='ko'?'글꼴 모드':'Font mode'}>
           {fontModes.map(mode=>(
-            <label key={mode}>
+            <label key={mode} title={mode==='readable'?(language==='ko'?'가독성 모드':'Reading'):(language==='ko'?'필기 모드':'Handwriting')}>
               <input type="radio" name="font-mode" value={mode} checked={fontMode===mode} onChange={()=>selectFontMode(mode)} />
-              <span>{mode==='readable'?(language==='ko'?'가독성 모드':'Reading'):(language==='ko'?'필기 모드':'Handwriting')}</span>
+              <span><PrefIcon name={mode}/><span className="pref-label">{mode==='readable'?(language==='ko'?'가독성 모드':'Reading'):(language==='ko'?'필기 모드':'Handwriting')}</span></span>
             </label>
           ))}
         </div>
         <div className="language-switch" data-language={language} role="group" aria-label={language==='ko'?'언어 선택':'Language'}>
-          <button aria-pressed={language==='ko'} onClick={()=>setLanguage('ko')}>한국어</button>
-          <button aria-pressed={language==='en'} onClick={()=>setLanguage('en')}>English</button>
+          <button aria-pressed={language==='ko'} title="한국어" onClick={()=>setLanguage('ko')}><span className="pref-icon pref-glyph" aria-hidden="true">가</span><span className="pref-label">한국어</span></button>
+          <button aria-pressed={language==='en'} title="English" onClick={()=>setLanguage('en')}><span className="pref-icon pref-glyph" aria-hidden="true">A</span><span className="pref-label">English</span></button>
         </div>
+        <button className="theme-toggle" aria-pressed={theme==='dark'} title={language==='ko'?'다크 모드':'Dark mode'} onClick={toggleTheme}><ThemeIcon name={theme==='dark'?'dark':'light'}/><span className="pref-label">{language==='ko'?'다크 모드':'Dark mode'}</span></button>
       </div>
       <div id="sidebar-account"/>
     </div></aside>
     <div className="main-shell">
     <main>
     {signedIn&&view==='home'&&<>
+      <ProfileEditor accountName={accountName}/>
+      <DeviceLinks/>
       <section className="stats" aria-label={t('공부 통계')}>
         <article><p>{language==='ko'?'연속':'Streak'}</p><strong>{today?streak(notes,today):0}<small>{language==='ko'?'일':today&&streak(notes,today)===1?'day':'days'}</small></strong></article>
         <article><p>{language==='ko'?`${month.getMonth()+1}월 횟수`:`${month.toLocaleDateString('en-US',{month:'short'})} sessions`}</p><strong>{monthNotes.length}<small>{language==='ko'?'회':monthNotes.length===1?'session':'sessions'}</small></strong></article>
         <article><p>Total</p><strong>{notes.length}<small>{language==='ko'?'개':notes.length===1?'note':'notes'}</small></strong></article>
       </section>
       <EggGarden notes={notes} today={today} selected={selectedDay} onSelect={setSelectedDay}/>
-      <ProfileEditor/>
-      <DeviceLinks/>
     </>}
     {signedIn&&view!=='connect'&&<section className={`notes-section ${view==='notes'?'full-notes':''}`}><div className="section-title"><div><h2>{selectedDay?(language==='ko'?`${selectedDay.slice(0,4)}년${selectedDay.slice(5,7)}월${selectedDay.slice(8,10)}일 공부노트`:`Study notes · ${new Date(`${selectedDay}T12:00:00`).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'})}`):view==='home'?t('최근 공부 노트'):t('저장한 노트')}{!selectedDay&&<span className="inline-count">{view==='home'?notes.length:filtered.length}</span>}</h2></div></div>{view==='notes'&&<div className="notes-tools"><label className="search-box"><Icon name="search" size={18}/><input aria-label={t('노트 검색')} placeholder={t('제목, 주제, 내용 검색')} value={search} onChange={e=>setSearch(e.target.value)}/></label><select aria-label={language==='en'?'Sort notes':'노트 정렬'} value={sortBy} onChange={e=>setSortBy(e.target.value as 'latest'|'comments'|'views')}><option value="latest">{language==='en'?'Newest':'최신순'}</option><option value="comments">{language==='en'?'Most comments':'댓글 많은순'}</option><option value="views">{language==='en'?'Most viewed':'조회수 많은순'}</option></select></div>}{!ready?<div className="empty-state">{t('기록을 불러오고 있어요.')}</div>:filtered.length?<div className="notes-ledger"><table><thead><tr><th scope="col">{language==='en'?'Date':'날짜'}</th><th scope="col">{language==='en'?'Title':'제목'}</th><th scope="col">{language==='en'?'Views':'조회'}</th><th scope="col">{language==='en'?'Comments':'댓글'}</th><th scope="col"><span className="ledger-download-heading">{language==='en'?'Download':'다운로드'}</span></th></tr></thead><tbody>{(view==='home'?filtered.slice(0,homeLimit):filtered).map(note=><tr key={note.id}><td><time dateTime={note.date}>{note.date.replaceAll('-','.')}</time></td><td className="ledger-title"><button onClick={()=>openDetail(note)}>{note.title}</button></td><td>{note.views??0}</td><td>{note.comments?.length??0}</td><td><NoteDownload iconOnly note={note} english={language==='en'} onMarkdown={()=>download(note)} onOriginal={accountId===note.ownerId&&note.messages?.length?()=>downloadOriginal(note):undefined}/></td></tr>)}</tbody></table>{view==='home'&&filtered.length>homeLimit&&<button className="text-button notes-more" onClick={showMore}>{t('기록에서 더보기')} <Icon name="arrow" size={16}/></button>}</div>:<div className="empty-state">{selectedDay&&selectedDay<today?<><EmptyNotebook/><h3>{language==='en'?`No study records for ${selectedDay.replaceAll('-','.')}.`:`${selectedDay.replaceAll('-','.')}에는 공부 기록이 존재하지 않아요`}</h3></>:<><h3>{search||subject!=='전체'||selectedDay?t('아직 해당하는 기록이 없어요'):t('아직 공부 노트가 없습니다')}</h3><p>{search||subject!=='전체'?t('검색어나 주제를 바꿔보세요.'):t('공부한 내용을 기록하면 이곳에 표시됩니다.')}</p><button className="text-button" onClick={()=>changeView('connect')}>{t('GPT와 공부하기')} <Icon name="arrow" size={16}/></button></>}</div>}</section>}
     <div className="study-container" hidden={view!=='connect'}><StudyChat resume={resume} onLogout={()=>{changeView('connect');setDetail(null);setEditor(false);setNotice('');}} onAccount={onAccount} onRecordsLoaded={onRecordsLoaded} onRecord={note=>setNotes(previous=>[{...note,ownerId:accountId??undefined},...previous.filter(n=>n.id!==note.id)])}/></div>

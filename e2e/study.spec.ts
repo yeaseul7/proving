@@ -54,7 +54,12 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+async function startGpt(page: Page) {
+  await page.getByRole('button', { name: /GPT로 시작하기/ }).click();
+}
+
 async function ask(page: Page) {
+  await startGpt(page);
   await question(page).fill('LEFT JOIN이 뭐야?');
   await expect(send(page)).toBeEnabled();
   await send(page).click();
@@ -80,6 +85,7 @@ test('질문과 답변을 새로고침 후 복원한다', async ({ page }) => {
 
 test('노트 전환과 새로고침 후 초안을 유지하고 노트를 3개로 제한한다', async ({ page }) => {
   await page.goto('/');
+  await startGpt(page);
   const title = page.getByRole('textbox', { name: '대화 제목', exact: true });
   await expect(title).toBeEnabled();
   await title.fill('첫 번째 노트');
@@ -104,6 +110,7 @@ test('AI 오류 후 질문을 중복 추가하지 않고 재시도한다', async
       : route.fulfill({ json: { account, text: answer } });
   });
   await page.goto('/');
+  await startGpt(page);
   await question(page).fill('LEFT JOIN이 뭐야?');
   await expect(send(page)).toBeEnabled();
   await send(page).click();
@@ -153,6 +160,7 @@ test('플랜 안내 확인 후 재방문에는 안내를 반복하지 않는다'
   const notice=page.getByRole('dialog',{name:'ChatGPT 플랜 사용 안내'});
   await expect(notice).toBeVisible();
   await notice.getByRole('button',{name:'확인',exact:true}).click();
+  await startGpt(page);
   await page.reload();
   await expect(page.getByRole('textbox',{name:'대화 제목',exact:true})).toBeEnabled();
   await expect(notice).toHaveCount(0);
@@ -180,6 +188,11 @@ test('권한 철회 시 대화를 유지하고 명시적으로 재인증한다',
   await question(page).fill('후속 질문');
   await send(page).click();
   await expect(page.getByRole('button',{name:'ChatGPT 다시 인증하기'})).toBeVisible();
+  // 오류는 복구 안내 상자 안에 한 번만 보이고, 대화가 유지된다는 안내를 함께 보여준다.
+  const recovery=page.locator('.chat-recovery');
+  await expect(recovery.getByRole('alert')).toHaveText('인증 만료');
+  await expect(recovery.getByText('공부 대화와 초안은 유지됩니다.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('region',{name:'GPT 공부 채팅',exact:true}).getByRole('alert')).toHaveCount(1);
   await expect(page.locator('.chat-message.user')).toHaveCount(2);
   await page.route('**/auth/login?reauthorize=1',route=>route.fulfill({contentType:'text/html',body:'재인증 테스트'}));
   await page.getByRole('button',{name:'ChatGPT 다시 인증하기'}).click();
@@ -215,28 +228,85 @@ test('보관함 저장 실패 후 대화를 유지하고 요약을 재사용해 
   await expect(page.locator('.chat-message.assistant')).toHaveCount(0);
 });
 
-test('화면별 글꼴 모드를 기억하고 모바일에서도 언어 선택을 가운데 정렬한다', async ({ page }) => {
+test('글꼴 모드를 모든 화면에 하나로 기억하고 모바일에서 설정 토글을 한 줄 가운데 정렬한다', async ({ page }) => {
   await page.goto('/');
   const readable = page.getByRole('radio', { name: '가독성 모드' });
   const handwriting = page.getByRole('radio', { name: '필기 모드' });
   await expect(handwriting).toBeChecked();
-  await page.getByText('가독성 모드', { exact: true }).click();
-  const shell = page.locator('.app-shell');
-  await expect(shell).toHaveAttribute('data-font-mode', 'readable');
-  await expect.poll(() => shell.evaluate(element => getComputedStyle(element).fontFamily)).toMatch(/pretendard/i);
+  await page.getByTitle('가독성 모드', { exact: true }).click();
+  const root = page.locator('html');
+  await expect(root).toHaveAttribute('data-font-mode', 'readable');
+  await expect.poll(() => page.locator('.app-shell').evaluate(element => getComputedStyle(element).fontFamily)).toMatch(/pretendard/i);
   const nav = page.getByRole('navigation', { name: '메인 메뉴' });
   await nav.getByRole('button', { name: '개요', exact: true }).click();
-  await expect(handwriting).toBeChecked();
+  await expect(readable).toBeChecked();
   await nav.getByRole('button', { name: '배우는 중', exact: true }).click();
   await expect(readable).toBeChecked();
   await page.reload();
+  await expect(root).toHaveAttribute('data-font-mode', 'readable');
   await expect(readable).toBeChecked();
 
   await page.setViewportSize({ width: 390, height: 844 });
   const language = page.getByRole('group', { name: '언어 선택' });
   await expect(language).toBeVisible();
-  const bounds = await language.boundingBox();
-  expect(Math.abs(bounds!.x + bounds!.width / 2 - 195)).toBeLessThan(2);
+  const preferences = page.locator('.sidebar-preferences');
+  const row = await preferences.evaluate(element => { const items = [...element.children].map(child => child.getBoundingClientRect()); return { left: Math.min(...items.map(r => r.left)), right: Math.max(...items.map(r => r.right)), tops: items.map(r => Math.round(r.top + r.height / 2)) }; });
+  expect(Math.abs((row.left + row.right) / 2 - 195)).toBeLessThan(2);
+  expect(new Set(row.tops).size).toBe(1);
+});
+
+test('다크 모드를 저장해 새로고침 전에 적용하고 저장값이 없으면 시스템 설정을 따른다', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/');
+  const root = page.locator('html');
+  const toggle = page.getByTitle('다크 모드', { exact: true });
+  await expect(root).toHaveAttribute('data-theme', 'dark');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.brand-logo-dark')).toBeVisible();
+  await expect(page.locator('.brand-logo-light')).toBeHidden();
+
+  await toggle.click();
+  await expect(root).toHaveAttribute('data-theme', 'light');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('.brand-logo-light')).toBeVisible();
+  // 시스템이 다크여도 사용자가 고른 라이트 모드를 첫 화면부터 유지한다.
+  await page.reload();
+  await expect(root).toHaveAttribute('data-theme', 'light');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+  await page.emulateMedia({ colorScheme: 'light' });
+  await toggle.click();
+  await page.reload();
+  await expect(root).toHaveAttribute('data-theme', 'dark');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('하루 기록 개수에 따라 달걀 단계를 범례와 같게 표시한다', async ({ page }) => {
+  const seoulDate = (daysAgo: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(Date.now() - daysAgo * 86_400_000);
+  const days = [seoulDate(1), seoulDate(2), seoulDate(3)];
+  const records = days.flatMap((date, index) => Array.from({ length: index + 1 }, (_, n) => ({
+    id: crypto.randomUUID(), title: `기록 ${index + 1}-${n + 1}`, subject: 'GPT 공부', date,
+    updatedAt: new Date().toISOString(), content: summary, messages: [], cloud: true as const,
+  })));
+  await page.route('**/api/study-sync', route => route.request().method() === 'GET'
+    ? route.fulfill({ json: { account, notebooks: [], records, closedIds: [] } })
+    : route.fallback());
+  await page.goto('/');
+  await page.getByRole('navigation', { name: '메인 메뉴' }).getByRole('button', { name: '개요', exact: true }).click();
+  const garden = page.getByRole('region', { name: '최근 1년 공부 기록' });
+  const legend = garden.locator('.legend-item');
+  await expect(legend).toHaveText(['적게', '보통', '많이']);
+  await expect(legend.nth(2)).toHaveAttribute('title', '하루 3개 이상');
+  for (const [index, date] of days.entries()) {
+    const count = index + 1;
+    const cell = garden.getByRole('button', { name: `${date} · 공부 기록 ${count}개`, exact: true });
+    await expect(cell).toHaveClass(/cooked/);
+    // 같은 개수의 범례 그림과 달력 칸의 그림이 일치해야 한다.
+    const legendEgg = await legend.nth(count - 1).locator('svg').evaluate(svg => svg.innerHTML);
+    expect(await cell.locator('svg').evaluate(svg => svg.innerHTML)).toBe(legendEgg);
+  }
+  const eggs = await legend.locator('svg').evaluateAll(list => list.map(svg => svg.innerHTML));
+  expect(new Set(eggs).size).toBe(3);
 });
 
 test('개요는 최근·선택한 날짜의 노트를 3개까지만 보여주고 나머지는 기록에서 본다', async ({ page }) => {
@@ -287,4 +357,35 @@ test('개요에서 Markdown 소개글과 공개 아이디를 저장하고 프로
   await expect(card.getByRole('link', { name: '/u/yeaseul' })).toBeVisible();
   expect(profile).toMatchObject({ handle: 'yeaseul', displayName: '예슬', isPublic: true });
   await expect(card.locator('strong', { hasText: 'SQL' })).toBeVisible();
+});
+
+test('사용자 Cloud 프로젝트를 OAuth로 연결해 Gemini에 질문한다', async ({ page }) => {
+  let connected = false;
+  await page.route('**/auth/google-cloud?*', route => {
+    expect(new URL(route.request().url()).searchParams.get('project')).toBe('my-study-project');
+    connected = true;
+    return route.fulfill({ status: 302, headers: { location: '/' } });
+  });
+  await page.route('**/api/session', route => route.fulfill({ json: {
+    account, name: '테스트 사용자', canChat: false, provider: 'google',
+    cloudAi: { enabled: true, models: connected ? [
+      { id: 'cloud:gemini', name: 'Gemini (Google Cloud)', provider: 'gemini' },
+    ] : [] },
+  } }));
+  const called: string[] = [];
+  await page.route('**/api/chat', route => {
+    const { model } = route.request().postDataJSON();
+    called.push(model);
+    return route.fulfill({ json: { text: model, account } });
+  });
+  await page.goto('/');
+  const picker = page.getByRole('group', { name: 'AI 선택' });
+  await picker.getByRole('button', { name: /Gemini로 시작하기/ }).click();
+  await expect(picker.getByRole('button', { name: /Claude|GPT/ })).toHaveCount(0);
+  await page.getByLabel('본인 Google Cloud 프로젝트 ID').fill('my-study-project');
+  await page.getByRole('button', { name: 'Google로 연결' }).click();
+  await question(page).fill('첫 질문');
+  await send(page).click();
+  await expect(page.locator('.chat-message.assistant')).toHaveText('cloud:gemini');
+  expect(called).toEqual(['cloud:gemini']);
 });

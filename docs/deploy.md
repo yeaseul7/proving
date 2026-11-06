@@ -1,6 +1,6 @@
 # 배포 (Vercel + Supabase)
 
-배포 사이트는 Google 로그인(Supabase Auth)을 쓰고, 서버는 GPT를 호출하지 않는다. 공부는 사용자가 등록한 Claude·Gemini API 키로 브라우저에서 하거나, 내 PC의 proving(ChatGPT 플랜)에서 하고 기기 연결로 동기화한다. 설계: [auth-ai-separation.md](auth-ai-separation.md)
+배포 사이트는 Google 로그인(Supabase Auth)을 쓰고, 서버는 GPT를 호출하지 않는다. 공부는 사용자 Google Cloud 프로젝트에 OAuth로 연결한 Gemini로 하거나, 내 PC의 proving(ChatGPT 플랜)에서 하고 기기 연결로 동기화한다. 설계: [auth-ai-separation.md](auth-ai-separation.md)
 
 ## 1. DB 마이그레이션
 
@@ -45,7 +45,7 @@ npx vercel link
 npx vercel --prod
 ```
 
-배포 후 확인: Google 로그인 → 개요 → 프로필 저장 → `/u/<아이디>` 메타 태그 → API 키로 질문 → 기록.
+배포 후 확인: Google 로그인 → 개요 → 프로필 저장 → `/u/<아이디>` 메타 태그 → Google OAuth로 Gemini를 연결해 질문 → 기록.
 
 ## 5. 운영자 기존 노트 연결
 
@@ -71,3 +71,24 @@ npm run dev
 ```
 
 PC의 proving은 ChatGPT 플랜으로 공부하고, 노트·기록은 배포 사이트 DB에 저장된다. 이 모드에서는 PC에 `DATABASE_URL`이 필요 없다. 기기 토큰은 `.local/sync.json`에만 있고, 배포 사이트의 "연결 끊기"로 폐기한다.
+
+## Gemini Google Cloud OAuth
+
+proving의 Google 로그인은 Supabase Auth를 사용한다. Gemini용 Google Cloud 연결은 별도의 권한 승인이다. 사용자가 연결 시 입력한 프로젝트로만 모델을 호출한다.
+
+1. Google Cloud 프로젝트에서 결제를 연결하고 Vertex AI API (`aiplatform.googleapis.com`)를 활성화한다. Gemini 모델이 지원되는 리전을 선택한다.
+2. 호출에 사용할 Google 계정에 해당 프로젝트의 모델 호출 권한을 부여한다. 테스트 상태인 외부 OAuth 앱은 해당 계정을 테스트 사용자로 추가한다.
+3. Google Auth Platform에서 모델 권한 연결용 **웹 애플리케이션** OAuth 클라이언트를 만들고 승인된 리디렉션 URI를 등록한다. 로컬은 `http://127.0.0.1:3005/auth/google-cloud/callback`, 배포는 `https://<배포 도메인>/auth/google-cloud/callback`이다. `NEXT_PUBLIC_SITE_URL`의 주소와 일치해야 한다.
+4. 개발은 `.env.local`, 배포는 Vercel 서버 환경변수에 아래 값을 등록한다.
+
+| 이름 | 값 |
+| --- | --- |
+| `GOOGLE_CLOUD_OAUTH_CLIENT_ID` | 모델 권한 연결용 OAuth 웹 클라이언트 ID |
+| `GOOGLE_CLOUD_OAUTH_CLIENT_SECRET` | 해당 클라이언트 Secret |
+| `GOOGLE_CLOUD_OAUTH_COOKIE_KEY` | `openssl rand -base64 32`로 생성한 서버 전용 키 |
+| `GOOGLE_CLOUD_LOCATION` | Gemini 모델이 지원되는 리전. 생략 시 `global` |
+| `GOOGLE_CLOUD_GEMINI_MODEL` | 해당 리전에서 호출할 Gemini 모델 ID |
+
+설정 적용 후 proving에 로그인하고 **Gemini로 시작하기**를 선택한다. 본인 Cloud 프로젝트 ID를 입력하고 Google OAuth 권한을 승인한다. 연결한 Google 계정에 프로젝트 사용 및 모델 호출 권한이 필요하다.
+
+호출은 설정한 Cloud 프로젝트에 청구된다. 사용자가 승인한 접근 토큰은 계정에 묶인 암호화 HttpOnly 쿠키에 보관하며, 최대 한 시간 또는 토큰 만료 시각까지 사용한다. 갱신 토큰을 요청하지 않으므로 만료 뒤에는 다시 연결한다.

@@ -1,0 +1,6 @@
+.local/
+.env*
+playwright-report/
+test-results/
+editor-preview.png
+*.tsbuildinfo
