@@ -1018,13 +1018,6 @@ img.profile-avatar-large { object-fit: cover; background: var(--color-surface-in
 .public-profile-intro { margin-bottom: 28px; }
 .public-profile-empty { margin-bottom: 28px; color: var(--color-text-muted); }
 
-.policy-links { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 8px; font-size: 13px; color: var(--color-text-muted); }
-.policy-links a:hover { color: var(--color-accent-hover); text-decoration: underline; }
-.policy-page { width: min(100%, 760px); margin: 0 auto; padding: 28px 20px 48px; overflow-wrap: anywhere; }
-.policy-page h1 { margin: 14px 0 10px; }
-.policy-page h2 { margin: 22px 0 6px; font-size: 22px; font-weight: 500; }
-.policy-page p, .policy-page li { margin-bottom: 8px; line-height: 1.8; }
-.policy-page a { color: var(--color-accent-hover); text-decoration: underline; text-underline-offset: 3px; }
 
 /* 배포 블로그의 소유자 소개 */
 .blog-owner { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; }

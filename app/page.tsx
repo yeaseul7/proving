@@ -241,10 +241,6 @@ export default function Home() {
         <button className="theme-toggle" aria-pressed={theme==='dark'} title={language==='ko'?'다크 모드':'Dark mode'} onClick={toggleTheme}><ThemeIcon name={theme==='dark'?'dark':'light'}/><span className="pref-label">{language==='ko'?'다크 모드':'Dark mode'}</span></button>
       </div>
       <div id="sidebar-account"/>
-      <div className="policy-links" aria-label={language==='en'?'Service policies':'서비스 정책'}>
-        <a href="/privacy">{language==='en'?'Privacy Policy':'개인정보처리방침'}</a>
-        <a href="/terms">{language==='en'?'Terms of Service':'이용약관'}</a>
-      </div>
     </div></aside>
     <div className="main-shell">
     <main>
